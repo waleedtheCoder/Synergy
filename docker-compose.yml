@@ -1,0 +1,60 @@
+name: synergi
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: synergi-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: synergi
+      POSTGRES_PASSWORD: synergi
+      POSTGRES_DB: synergi
+    ports:
+      - "5432:5432"
+    volumes:
+      - synergi_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U synergi -d synergi"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: synergi-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - synergi_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.11
+    container_name: synergi-meilisearch
+    restart: unless-stopped
+    environment:
+      MEILI_MASTER_KEY: synergi_dev_master_key
+      MEILI_ENV: development
+      MEILI_NO_ANALYTICS: "true"
+    ports:
+      - "7700:7700"
+    volumes:
+      - synergi_meili_data:/meili_data
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: synergi-mailhog
+    restart: unless-stopped
+    ports:
+      - "1025:1025" # SMTP
+      - "8025:8025" # Web UI
+
+volumes:
+  synergi_postgres_data:
+  synergi_redis_data:
+  synergi_meili_data:

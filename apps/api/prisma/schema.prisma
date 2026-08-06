@@ -1,0 +1,958 @@
+// ════════════════════════════════════════════════════════════════════════
+// Synergi — Prisma schema
+// Construction marketplace: clients, professionals, admins.
+// ════════════════════════════════════════════════════════════════════════
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Enums
+// ────────────────────────────────────────────────────────────────────────
+
+enum Role {
+  CLIENT
+  PROFESSIONAL
+  ADMIN
+}
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  DEACTIVATED
+}
+
+enum AuthProvider {
+  LOCAL
+  GOOGLE
+}
+
+enum VerificationTokenType {
+  EMAIL_VERIFY
+  PASSWORD_RESET
+}
+
+enum ResponseTime {
+  WITHIN_HOUR
+  WITHIN_DAY
+  WITHIN_WEEK
+}
+
+enum AvailabilityStatus {
+  AVAILABLE
+  BUSY
+  UNAVAILABLE
+}
+
+enum PriceType {
+  FIXED
+  HOURLY
+  QUOTE
+}
+
+enum ProjectRequestStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  PDF
+  QUOTATION_REQUEST
+  QUOTATION
+  MEETING
+  SYSTEM
+}
+
+enum AttachmentType {
+  IMAGE
+  PDF
+  VIDEO
+  DOCUMENT
+}
+
+enum QuotationStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  COUNTERED
+  EXPIRED
+}
+
+enum MeetingStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum NotificationType {
+  MESSAGE
+  QUOTATION
+  REVIEW
+  BOOKING
+  PAYMENT
+  SYSTEM
+  PROMOTION
+  MEETING
+}
+
+enum SubscriptionPlan {
+  BASIC
+  PROFESSIONAL
+  BUSINESS
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  EXPIRED
+}
+
+enum PaymentType {
+  SUBSCRIPTION
+  ADVERTISEMENT
+  OTHER
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+}
+
+enum AdPlacement {
+  HOMEPAGE_HERO
+  HOMEPAGE_MIDDLE
+  SEARCH_SIDEBAR
+  PROFESSIONAL_PROFILE
+  PROJECT_FEED
+  DASHBOARD
+  MOBILE_BANNER
+}
+
+enum CampaignStatus {
+  DRAFT
+  PENDING_REVIEW
+  ACTIVE
+  PAUSED
+  COMPLETED
+  REJECTED
+}
+
+enum AdEventType {
+  IMPRESSION
+  CLICK
+}
+
+enum AnalyticsEventType {
+  PROFILE_VIEW
+  SEARCH_APPEARANCE
+  PROFILE_CLICK
+  INQUIRY
+}
+
+enum DisputeStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED
+  REJECTED
+}
+
+enum ReportTargetType {
+  USER
+  REVIEW
+  MESSAGE
+  PORTFOLIO_PROJECT
+  PROJECT_REQUEST
+}
+
+enum ReportStatus {
+  PENDING
+  ACTIONED
+  DISMISSED
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Identity & Auth
+// ────────────────────────────────────────────────────────────────────────
+
+model User {
+  id              String       @id @default(cuid())
+  email           String       @unique
+  phone           String?
+  passwordHash    String?      @map("password_hash")
+  authProvider    AuthProvider @default(LOCAL) @map("auth_provider")
+  googleId        String?      @unique @map("google_id")
+  role            Role
+  status          UserStatus   @default(PENDING)
+  firstName       String       @map("first_name")
+  lastName        String       @map("last_name")
+  avatarUrl       String?      @map("avatar_url")
+  emailVerified   Boolean      @default(false) @map("email_verified")
+  emailVerifiedAt DateTime?    @map("email_verified_at")
+  lastLoginAt     DateTime?    @map("last_login_at")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  clientProfile       ClientProfile?
+  professionalProfile ProfessionalProfile?
+  refreshTokens       RefreshToken[]
+  verificationTokens  VerificationToken[]
+  sentMessages        Message[]            @relation("MessageSender")
+  notifications       Notification[]
+  reviewsWritten      Review[]             @relation("ReviewAuthor")
+  payments            Payment[]
+  advertiser          Advertiser?
+  reportsFiled        Report[]             @relation("ReportsFiled")
+  disputesRaised      Dispute[]            @relation("DisputesRaised")
+  disputesAgainst     Dispute[]            @relation("DisputesAgainst")
+  questionsAsked      Question[]           @relation("QuestionAsker")
+  projectLikes        ProjectLike[]
+  projectBookmarks    ProjectBookmark[]
+  comments            Comment[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id              String    @id @default(cuid())
+  userId          String    @map("user_id")
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash       String    @unique @map("token_hash")
+  userAgent       String?   @map("user_agent")
+  ipAddress       String?   @map("ip_address")
+  expiresAt       DateTime  @map("expires_at")
+  revokedAt       DateTime? @map("revoked_at")
+  replacedByToken String?   @map("replaced_by_token")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model VerificationToken {
+  id        String                @id @default(cuid())
+  userId    String                @map("user_id")
+  user      User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      VerificationTokenType
+  tokenHash String                @unique @map("token_hash")
+  expiresAt DateTime              @map("expires_at")
+  usedAt    DateTime?             @map("used_at")
+  createdAt DateTime              @default(now()) @map("created_at")
+
+  @@index([userId, type])
+  @@map("verification_tokens")
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Geography
+// ────────────────────────────────────────────────────────────────────────
+
+model Country {
+  id     String  @id @default(cuid())
+  name   String
+  code   String  @unique
+  states State[]
+  cities City[]
+
+  @@map("countries")
+}
+
+model State {
+  id        String  @id @default(cuid())
+  name      String
+  code      String?
+  countryId String  @map("country_id")
+  country   Country @relation(fields: [countryId], references: [id], onDelete: Cascade)
+  cities    City[]
+
+  @@index([countryId])
+  @@map("states")
+}
+
+model City {
+  id        String  @id @default(cuid())
+  name      String
+  latitude  Float?
+  longitude Float?
+  stateId   String  @map("state_id")
+  state     State   @relation(fields: [stateId], references: [id], onDelete: Cascade)
+  countryId String  @map("country_id")
+  country   Country @relation(fields: [countryId], references: [id], onDelete: Cascade)
+
+  professionalProfiles ProfessionalProfile[]
+  projectRequests      ProjectRequest[]
+
+  @@index([stateId])
+  @@index([countryId])
+  @@map("cities")
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Categories
+// ────────────────────────────────────────────────────────────────────────
+
+model Category {
+  id       String     @id @default(cuid())
+  name     String
+  slug     String     @unique
+  icon     String?
+  parentId String?    @map("parent_id")
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children Category[] @relation("CategoryTree")
+
+  professionalProfiles ProfessionalProfile[]
+  services             Service[]
+  portfolioProjects    PortfolioProject[]
+  projectRequests      ProjectRequest[]
+
+  @@index([parentId])
+  @@map("categories")
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Client
+// ────────────────────────────────────────────────────────────────────────
+
+model ClientProfile {
+  id            String   @id @default(cuid())
+  userId        String   @unique @map("user_id")
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  coverImageUrl String?  @map("cover_image_url")
+  address       String?
+  preferences   Json?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  projectRequests ProjectRequest[]
+  chats           Chat[]
+  reviews         Review[]
+  quotations      Quotation[]
+  meetings        Meeting[]
+  favorites       Favorite[]
+
+  @@map("client_profiles")
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Professional
+// ────────────────────────────────────────────────────────────────────────
+
+model ProfessionalProfile {
+  id                 String             @id @default(cuid())
+  userId             String             @unique @map("user_id")
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessName       String?            @map("business_name")
+  slug               String             @unique
+  tagline            String?
+  about              String?
+  coverImageUrl      String?            @map("cover_image_url")
+  categoryId         String?            @map("category_id")
+  category           Category?          @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  yearsExperience    Int?               @map("years_experience")
+  languages          String[]
+  responseTime       ResponseTime?      @map("response_time")
+  availability       AvailabilityStatus @default(AVAILABLE)
+  hourlyRateMin      Decimal?           @map("hourly_rate_min") @db.Decimal(10, 2)
+  hourlyRateMax      Decimal?           @map("hourly_rate_max") @db.Decimal(10, 2)
+  verified           Boolean            @default(false)
+  verificationBadges String[]           @map("verification_badges")
+  cityId             String?            @map("city_id")
+  city               City?              @relation(fields: [cityId], references: [id], onDelete: SetNull)
+  latitude           Float?
+  longitude          Float?
+
+  ratingAvg              Decimal @default(0) @map("rating_avg") @db.Decimal(3, 2)
+  ratingCount            Int     @default(0) @map("rating_count")
+  completedProjectsCount Int     @default(0) @map("completed_projects_count")
+  profileViewsCount      Int     @default(0) @map("profile_views_count")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  skills            ProfessionalSkill[]
+  certificates      Certificate[]
+  portfolioProjects PortfolioProject[]
+  services          Service[]
+  projectRequests   ProjectRequest[]    @relation("AwardedProfessional")
+  chats             Chat[]
+  reviews           Review[]            @relation("ProfessionalReviews")
+  favoritedBy       Favorite[]
+  quotations        Quotation[]
+  meetings          Meeting[]
+  subscription      Subscription?
+  analyticsEvents   AnalyticsEvent[]
+  sponsoredListings SponsoredListing[]
+  questions         Question[]
+
+  @@index([categoryId])
+  @@index([cityId])
+  @@map("professional_profiles")
+}
+
+model Skill {
+  id            String              @id @default(cuid())
+  name          String              @unique
+  professionals ProfessionalSkill[]
+
+  @@map("skills")
+}
+
+model ProfessionalSkill {
+  professionalId String              @map("professional_id")
+  professional   ProfessionalProfile @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  skillId        String              @map("skill_id")
+  skill          Skill               @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@id([professionalId, skillId])
+  @@map("professional_skills")
+}
+
+model Certificate {
+  id             String              @id @default(cuid())
+  professionalId String              @map("professional_id")
+  professional   ProfessionalProfile @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  title          String
+  issuer         String?
+  issueDate      DateTime?           @map("issue_date")
+  fileUrl        String              @map("file_url")
+  verified       Boolean             @default(false)
+  createdAt      DateTime            @default(now()) @map("created_at")
+
+  @@index([professionalId])
+  @@map("certificates")
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Portfolio / Project feed
+// ────────────────────────────────────────────────────────────────────────
+
+model PortfolioProject {
+  id                 String              @id @default(cuid())
+  professionalId     String              @map("professional_id")
+  professional       ProfessionalProfile @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  title              String
+  description        String?
+  categoryId         String?             @map("category_id")
+  category           Category?           @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  location           String?
+  budgetMin          Decimal?            @map("budget_min") @db.Decimal(12, 2)
+  budgetMax          Decimal?            @map("budget_max") @db.Decimal(12, 2)
+  constructionStages Json?               @map("construction_stages")
+  published          Boolean             @default(true)
+  likesCount         Int                 @default(0) @map("likes_count")
+  bookmarksCount     Int                 @default(0) @map("bookmarks_count")
+  completedAt        DateTime?           @map("completed_at")
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
+
+  images    PortfolioMedia[]
+  likes     ProjectLike[]
+  bookmarks ProjectBookmark[]
+  comments  Comment[]
+
+  @@index([professionalId])
+  @@index([categoryId])
+  @@map("portfolio_projects")
+}
+
+model PortfolioMedia {
+  id                 String           @id @default(cuid())
+  portfolioProjectId String           @map("portfolio_project_id")
+  portfolioProject   PortfolioProject @relation(fields: [portfolioProjectId], references: [id], onDelete: Cascade)
+  url                String
+  type               AttachmentType   @default(IMAGE)
+  caption            String?
+  order              Int              @default(0)
+
+  @@index([portfolioProjectId])
+  @@map("portfolio_media")
+}
+
+model ProjectLike {
+  userId             String           @map("user_id")
+  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  portfolioProjectId String           @map("portfolio_project_id")
+  portfolioProject   PortfolioProject @relation(fields: [portfolioProjectId], references: [id], onDelete: Cascade)
+  createdAt          DateTime         @default(now()) @map("created_at")
+
+  @@id([userId, portfolioProjectId])
+  @@map("project_likes")
+}
+
+model ProjectBookmark {
+  userId             String           @map("user_id")
+  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  portfolioProjectId String           @map("portfolio_project_id")
+  portfolioProject   PortfolioProject @relation(fields: [portfolioProjectId], references: [id], onDelete: Cascade)
+  createdAt          DateTime         @default(now()) @map("created_at")
+
+  @@id([userId, portfolioProjectId])
+  @@map("project_bookmarks")
+}
+
+model Comment {
+  id                 String           @id @default(cuid())
+  portfolioProjectId String           @map("portfolio_project_id")
+  portfolioProject   PortfolioProject @relation(fields: [portfolioProjectId], references: [id], onDelete: Cascade)
+  userId             String           @map("user_id")
+  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content            String
+  createdAt          DateTime         @default(now()) @map("created_at")
+
+  @@index([portfolioProjectId])
+  @@map("comments")
+}
+
+model Question {
+  id             String              @id @default(cuid())
+  professionalId String              @map("professional_id")
+  professional   ProfessionalProfile @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  askedById      String              @map("asked_by_id")
+  askedBy        User                @relation("QuestionAsker", fields: [askedById], references: [id], onDelete: Cascade)
+  question       String
+  answer         String?
+  answeredAt     DateTime?           @map("answered_at")
+  createdAt      DateTime            @default(now()) @map("created_at")
+
+  @@index([professionalId])
+  @@map("questions")
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Services
+// ────────────────────────────────────────────────────────────────────────
+
+model Service {
+  id             String              @id @default(cuid())
+  professionalId String              @map("professional_id")
+  professional   ProfessionalProfile @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  title          String
+  description    String?
+  categoryId     String?             @map("category_id")
+  category       Category?           @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  priceType      PriceType           @default(FIXED) @map("price_type")
+  price          Decimal?            @db.Decimal(12, 2)
+  minPrice       Decimal?            @map("min_price") @db.Decimal(12, 2)
+  maxPrice       Decimal?            @map("max_price") @db.Decimal(12, 2)
+  active         Boolean             @default(true)
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+
+  @@index([professionalId])
+  @@map("services")
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Project requests (client demand side)
+// ────────────────────────────────────────────────────────────────────────
+
+model ProjectRequest {
+  id                    String               @id @default(cuid())
+  clientId              String               @map("client_id")
+  client                ClientProfile        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  title                 String
+  description           String
+  budgetMin             Decimal?             @map("budget_min") @db.Decimal(12, 2)
+  budgetMax             Decimal?             @map("budget_max") @db.Decimal(12, 2)
+  timeline              String?
+  categoryId            String?              @map("category_id")
+  category              Category?            @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  cityId                String?              @map("city_id")
+  city                  City?                @relation(fields: [cityId], references: [id], onDelete: SetNull)
+  address               String?
+  status                ProjectRequestStatus @default(OPEN)
+  awardedProfessionalId String?              @map("awarded_professional_id")
+  awardedProfessional   ProfessionalProfile? @relation("AwardedProfessional", fields: [awardedProfessionalId], references: [id], onDelete: SetNull)
+  createdAt             DateTime             @default(now()) @map("created_at")
+  updatedAt             DateTime             @updatedAt @map("updated_at")
+
+  attachments Attachment[]
+  chats       Chat[]
+  quotations  Quotation[]
+  reviews     Review[]
+
+  @@index([clientId])
+  @@index([categoryId])
+  @@index([cityId])
+  @@index([status])
+  @@map("project_requests")
+}
+
+model Attachment {
+  id           String         @id @default(cuid())
+  url          String
+  filename     String
+  type         AttachmentType
+  size         Int
+  uploadedById String         @map("uploaded_by_id")
+
+  projectRequestId String?         @map("project_request_id")
+  projectRequest   ProjectRequest? @relation(fields: [projectRequestId], references: [id], onDelete: Cascade)
+
+  messageId String?  @map("message_id")
+  message   Message? @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  quotationId String?    @map("quotation_id")
+  quotation   Quotation? @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([projectRequestId])
+  @@index([messageId])
+  @@index([quotationId])
+  @@map("attachments")
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Messaging
+// ────────────────────────────────────────────────────────────────────────
+
+model Chat {
+  id               String              @id @default(cuid())
+  clientId         String              @map("client_id")
+  client           ClientProfile       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  professionalId   String              @map("professional_id")
+  professional     ProfessionalProfile @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  projectRequestId String?             @map("project_request_id")
+  projectRequest   ProjectRequest?     @relation(fields: [projectRequestId], references: [id], onDelete: SetNull)
+  lastMessageAt    DateTime?           @map("last_message_at")
+  createdAt        DateTime            @default(now()) @map("created_at")
+
+  messages   Message[]
+  quotations Quotation[]
+  meetings   Meeting[]
+
+  @@unique([clientId, professionalId])
+  @@index([professionalId])
+  @@map("chats")
+}
+
+model Message {
+  id          String      @id @default(cuid())
+  chatId      String      @map("chat_id")
+  chat        Chat        @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  senderId    String      @map("sender_id")
+  sender      User        @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  type        MessageType @default(TEXT)
+  content     String?
+  quotationId String?     @unique @map("quotation_id")
+  quotation   Quotation?  @relation(fields: [quotationId], references: [id], onDelete: SetNull)
+  meetingId   String?     @unique @map("meeting_id")
+  meeting     Meeting?    @relation(fields: [meetingId], references: [id], onDelete: SetNull)
+  readAt      DateTime?   @map("read_at")
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  attachments Attachment[]
+
+  @@index([chatId])
+  @@map("messages")
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Quotations
+// ────────────────────────────────────────────────────────────────────────
+
+model Quotation {
+  id               String              @id @default(cuid())
+  chatId           String              @map("chat_id")
+  chat             Chat                @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  projectRequestId String?             @map("project_request_id")
+  projectRequest   ProjectRequest?     @relation(fields: [projectRequestId], references: [id], onDelete: SetNull)
+  professionalId   String              @map("professional_id")
+  professional     ProfessionalProfile @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  clientId         String              @map("client_id")
+  client           ClientProfile       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  status           QuotationStatus     @default(DRAFT)
+  totalAmount      Decimal             @map("total_amount") @db.Decimal(12, 2)
+  currency         String              @default("USD")
+  notes            String?
+  validUntil       DateTime?           @map("valid_until")
+  pdfUrl           String?             @map("pdf_url")
+  revisionOfId     String?             @map("revision_of_id")
+  revisionOf       Quotation?          @relation("QuotationRevisions", fields: [revisionOfId], references: [id], onDelete: SetNull)
+  revisions        Quotation[]         @relation("QuotationRevisions")
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+
+  items       QuotationItem[]
+  attachments Attachment[]
+  message     Message?
+
+  @@index([chatId])
+  @@index([professionalId])
+  @@index([clientId])
+  @@map("quotations")
+}
+
+model QuotationItem {
+  id          String    @id @default(cuid())
+  quotationId String    @map("quotation_id")
+  quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Decimal   @default(1) @db.Decimal(10, 2)
+  unitPrice   Decimal   @map("unit_price") @db.Decimal(12, 2)
+  total       Decimal   @db.Decimal(12, 2)
+
+  @@index([quotationId])
+  @@map("quotation_items")
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Meetings
+// ────────────────────────────────────────────────────────────────────────
+
+model Meeting {
+  id             String              @id @default(cuid())
+  chatId         String              @map("chat_id")
+  chat           Chat                @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  clientId       String              @map("client_id")
+  client         ClientProfile       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  professionalId String              @map("professional_id")
+  professional   ProfessionalProfile @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  scheduledAt    DateTime            @map("scheduled_at")
+  durationMins   Int                 @default(30) @map("duration_mins")
+  status         MeetingStatus       @default(SCHEDULED)
+  location       String?
+  meetingLink    String?             @map("meeting_link")
+  notes          String?
+  createdAt      DateTime            @default(now()) @map("created_at")
+
+  message Message?
+
+  @@index([clientId])
+  @@index([professionalId])
+  @@map("meetings")
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Reviews & Favorites
+// ────────────────────────────────────────────────────────────────────────
+
+model Review {
+  id               String              @id @default(cuid())
+  professionalId   String              @map("professional_id")
+  professional     ProfessionalProfile @relation("ProfessionalReviews", fields: [professionalId], references: [id], onDelete: Cascade)
+  clientId         String              @map("client_id")
+  client           ClientProfile       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  authorId         String              @map("author_id")
+  author           User                @relation("ReviewAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  projectRequestId String?             @map("project_request_id")
+  projectRequest   ProjectRequest?     @relation(fields: [projectRequestId], references: [id], onDelete: SetNull)
+  rating           Int
+  comment          String?
+  response         String?
+  respondedAt      DateTime?           @map("responded_at")
+  createdAt        DateTime            @default(now()) @map("created_at")
+
+  @@index([professionalId])
+  @@index([clientId])
+  @@map("reviews")
+}
+
+model Favorite {
+  clientId       String              @map("client_id")
+  client         ClientProfile       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  professionalId String              @map("professional_id")
+  professional   ProfessionalProfile @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  createdAt      DateTime            @default(now()) @map("created_at")
+
+  @@id([clientId, professionalId])
+  @@map("favorites")
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Notifications
+// ────────────────────────────────────────────────────────────────────────
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String           @map("user_id")
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  body      String?
+  data      Json?
+  read      Boolean          @default(false)
+  readAt    DateTime?        @map("read_at")
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  @@index([userId, read])
+  @@map("notifications")
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Subscriptions & Payments
+// ────────────────────────────────────────────────────────────────────────
+
+model Subscription {
+  id                   String              @id @default(cuid())
+  professionalId       String              @unique @map("professional_id")
+  professional         ProfessionalProfile @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  plan                 SubscriptionPlan    @default(BASIC)
+  status               SubscriptionStatus  @default(ACTIVE)
+  stripeCustomerId     String?             @map("stripe_customer_id")
+  stripeSubscriptionId String?             @unique @map("stripe_subscription_id")
+  currentPeriodEnd     DateTime?           @map("current_period_end")
+  cancelAtPeriodEnd    Boolean             @default(false) @map("cancel_at_period_end")
+  createdAt            DateTime            @default(now()) @map("created_at")
+  updatedAt            DateTime            @updatedAt @map("updated_at")
+
+  payments Payment[]
+
+  @@map("subscriptions")
+}
+
+model Payment {
+  id                    String        @id @default(cuid())
+  userId                String        @map("user_id")
+  user                  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscriptionId        String?       @map("subscription_id")
+  subscription          Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  campaignId            String?       @map("campaign_id")
+  campaign              Campaign?     @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  type                  PaymentType
+  status                PaymentStatus @default(PENDING)
+  amount                Decimal       @db.Decimal(12, 2)
+  currency              String        @default("USD")
+  stripePaymentIntentId String?       @unique @map("stripe_payment_intent_id")
+  createdAt             DateTime      @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("payments")
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Advertisements
+// ────────────────────────────────────────────────────────────────────────
+
+model Advertiser {
+  id           String   @id @default(cuid())
+  userId       String   @unique @map("user_id")
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyName  String   @map("company_name")
+  billingEmail String?  @map("billing_email")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  campaigns Campaign[]
+
+  @@map("advertisers")
+}
+
+model Campaign {
+  id             String         @id @default(cuid())
+  advertiserId   String         @map("advertiser_id")
+  advertiser     Advertiser     @relation(fields: [advertiserId], references: [id], onDelete: Cascade)
+  name           String
+  placement      AdPlacement
+  bannerImageUrl String         @map("banner_image_url")
+  targetUrl      String         @map("target_url")
+  budget         Decimal        @db.Decimal(12, 2)
+  spend          Decimal        @default(0) @db.Decimal(12, 2)
+  status         CampaignStatus @default(DRAFT)
+  startDate      DateTime       @map("start_date")
+  endDate        DateTime       @map("end_date")
+  impressions    Int            @default(0)
+  clicks         Int            @default(0)
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  events            AdEvent[]
+  payments          Payment[]
+  sponsoredListings SponsoredListing[]
+
+  @@index([advertiserId])
+  @@index([placement, status])
+  @@map("campaigns")
+}
+
+model AdEvent {
+  id         String      @id @default(cuid())
+  campaignId String      @map("campaign_id")
+  campaign   Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  type       AdEventType
+  userId     String?     @map("user_id")
+  createdAt  DateTime    @default(now()) @map("created_at")
+
+  @@index([campaignId, type, createdAt])
+  @@map("ad_events")
+}
+
+model SponsoredListing {
+  id             String               @id @default(cuid())
+  campaignId     String               @map("campaign_id")
+  campaign       Campaign             @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  professionalId String?              @map("professional_id")
+  professional   ProfessionalProfile? @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  createdAt      DateTime             @default(now()) @map("created_at")
+
+  @@index([campaignId])
+  @@map("sponsored_listings")
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Analytics
+// ────────────────────────────────────────────────────────────────────────
+
+model AnalyticsEvent {
+  id             String              @id @default(cuid())
+  professionalId String              @map("professional_id")
+  professional   ProfessionalProfile @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  type           AnalyticsEventType
+  meta           Json?
+  createdAt      DateTime            @default(now()) @map("created_at")
+
+  @@index([professionalId, type, createdAt])
+  @@map("analytics_events")
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Moderation
+// ────────────────────────────────────────────────────────────────────────
+
+model Dispute {
+  id          String        @id @default(cuid())
+  raisedById  String        @map("raised_by_id")
+  raisedBy    User          @relation("DisputesRaised", fields: [raisedById], references: [id], onDelete: Cascade)
+  againstId   String        @map("against_id")
+  against     User          @relation("DisputesAgainst", fields: [againstId], references: [id], onDelete: Cascade)
+  reason      String
+  description String?
+  status      DisputeStatus @default(OPEN)
+  resolution  String?
+  createdAt   DateTime      @default(now()) @map("created_at")
+  resolvedAt  DateTime?     @map("resolved_at")
+
+  @@index([status])
+  @@map("disputes")
+}
+
+model Report {
+  id         String           @id @default(cuid())
+  reporterId String           @map("reporter_id")
+  reporter   User             @relation("ReportsFiled", fields: [reporterId], references: [id], onDelete: Cascade)
+  targetType ReportTargetType @map("target_type")
+  targetId   String           @map("target_id")
+  reason     String
+  status     ReportStatus     @default(PENDING)
+  createdAt  DateTime         @default(now()) @map("created_at")
+
+  @@index([targetType, targetId])
+  @@map("reports")
+}

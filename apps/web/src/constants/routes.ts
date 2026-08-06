@@ -1,0 +1,16 @@
+export const ROUTES = {
+  home: "/",
+  login: "/login",
+  register: "/register",
+  forgotPassword: "/forgot-password",
+  resetPassword: "/reset-password",
+  verifyEmail: "/verify-email",
+  clientDashboard: "/dashboard",
+  dashboardRequests: "/dashboard/requests",
+  dashboardRequestsNew: "/dashboard/requests/new",
+  dashboardFavorites: "/dashboard/favorites",
+  dashboardNotifications: "/dashboard/notifications",
+  dashboardSettings: "/dashboard/settings",
+  professionalDashboard: "/pro/dashboard",
+  admin: "/admin",
+} as const;
