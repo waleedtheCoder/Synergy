@@ -11,6 +11,7 @@ import * as bcrypt from 'bcryptjs';
 import type jwt from 'jsonwebtoken';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
+import { SearchService } from '../search/search.service';
 import { generateRawToken, hashToken } from '../../common/utils/crypto.util';
 import { uniqueSlug } from '../../common/utils/slug.util';
 import {
@@ -39,6 +40,7 @@ export class AuthService {
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
     private readonly mail: MailService,
+    private readonly searchService: SearchService,
   ) {}
 
   // ── Registration ─────────────────────────────────────────────────────
@@ -75,7 +77,14 @@ export class AuthService {
               },
             }),
       },
+      include: { professionalProfile: { select: { id: true } } },
     });
+
+    if (user.professionalProfile) {
+      void this.searchService.indexProfessionalById(
+        user.professionalProfile.id,
+      );
+    }
 
     await this.issueEmailVerification(user.id, user.email, user.firstName);
 
@@ -156,7 +165,7 @@ export class AuthService {
       } else {
         const role: Role = profile.intendedRole ?? Role.CLIENT;
 
-        user = await this.prisma.user.create({
+        const created = await this.prisma.user.create({
           data: {
             email: profile.email,
             googleId: profile.googleId,
@@ -180,7 +189,15 @@ export class AuthService {
                   },
                 }),
           },
+          include: { professionalProfile: { select: { id: true } } },
         });
+        user = created;
+
+        if (created.professionalProfile) {
+          void this.searchService.indexProfessionalById(
+            created.professionalProfile.id,
+          );
+        }
       }
     }
 

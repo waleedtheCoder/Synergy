@@ -31,6 +31,10 @@ export async function fetchFavorites(params: { page?: number }) {
   return data.data;
 }
 
+export async function addFavorite(professionalId: string) {
+  await apiClient.post<ApiEnvelope<null>>(`/favorites/${professionalId}`);
+}
+
 export async function removeFavorite(professionalId: string) {
   await apiClient.delete<ApiEnvelope<null>>(`/favorites/${professionalId}`);
 }

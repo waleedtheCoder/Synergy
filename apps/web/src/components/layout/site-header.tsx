@@ -20,6 +20,8 @@ import { useAuthStore } from "@/features/auth/store/auth-store";
 import { useLogout } from "@/features/auth/hooks";
 
 const NAV_LINKS = [
+  { href: ROUTES.professional, label: "Find professionals" },
+  { href: ROUTES.feed, label: "Feed" },
   { href: "#how-it-works", label: "How it works" },
   { href: "#categories", label: "Categories" },
   { href: "#for-professionals", label: "For professionals" },
@@ -91,13 +93,13 @@ export function SiteHeader() {
 
         <nav className="hidden items-center gap-8 md:flex">
           {NAV_LINKS.map((link) => (
-            <a
+            <Link
               key={link.href}
               href={link.href}
               className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
               {link.label}
-            </a>
+            </Link>
           ))}
         </nav>
 
@@ -129,14 +131,14 @@ export function SiteHeader() {
         <div className="border-t border-border/60 bg-background px-4 pb-6 md:hidden">
           <nav className="flex flex-col gap-1 pt-4">
             {NAV_LINKS.map((link) => (
-              <a
+              <Link
                 key={link.href}
                 href={link.href}
                 onClick={() => setMobileOpen(false)}
                 className="rounded-lg px-2 py-2.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
               >
                 {link.label}
-              </a>
+              </Link>
             ))}
           </nav>
           <Separator className="my-4" />

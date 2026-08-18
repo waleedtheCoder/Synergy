@@ -3,6 +3,7 @@ import { AxiosError } from "axios";
 import { toast } from "sonner";
 import { useAuthStore } from "@/features/auth/store/auth-store";
 import {
+  addFavorite,
   fetchFavorites,
   fetchNotifications,
   fetchProfile,
@@ -52,6 +53,21 @@ export function useFavorites(params: { page?: number }) {
   return useQuery({
     queryKey: ["favorites", "me", params],
     queryFn: () => fetchFavorites(params),
+  });
+}
+
+export function useAddFavorite() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: addFavorite,
+    onSuccess: () => {
+      toast.success("Added to favorites");
+      void queryClient.invalidateQueries({ queryKey: ["favorites"] });
+    },
+    onError: (error) => {
+      toast.error(errorMessage(error, "Could not add to favorites"));
+    },
   });
 }
 

@@ -1,18 +1,30 @@
 "use client";
 
 import { useState } from "react";
-import { Heart, Loader2, Star } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Heart, Loader2, MessageSquare, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { ROUTES } from "@/constants/routes";
 import { PageHeader } from "@/features/dashboard/components/page-header";
 import { EmptyState } from "@/features/dashboard/components/empty-state";
 import { useFavorites, useRemoveFavorite } from "@/features/dashboard/hooks";
+import { useStartChat } from "@/features/chats/hooks";
 
 export default function FavoritesPage() {
   const [page, setPage] = useState(1);
+  const router = useRouter();
   const { data, isLoading } = useFavorites({ page });
   const removeFavorite = useRemoveFavorite();
+  const startChat = useStartChat();
+
+  function handleMessage(professionalId: string) {
+    startChat.mutate(
+      { counterpartId: professionalId },
+      { onSuccess: (chat) => router.push(`${ROUTES.dashboardMessages}/${chat.id}`) },
+    );
+  }
 
   return (
     <div>
@@ -68,15 +80,26 @@ export default function FavoritesPage() {
                   <Star className="size-3.5 fill-primary text-primary" />
                   {Number(professional.ratingAvg).toFixed(1)} ({professional.ratingCount})
                 </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => removeFavorite.mutate(professional.id)}
-                  disabled={removeFavorite.isPending}
-                >
-                  <Heart className="fill-primary text-primary" />
-                  Remove
-                </Button>
+                <div className="flex gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleMessage(professional.id)}
+                    disabled={startChat.isPending}
+                  >
+                    <MessageSquare />
+                    Message
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeFavorite.mutate(professional.id)}
+                    disabled={removeFavorite.isPending}
+                  >
+                    <Heart className="fill-primary text-primary" />
+                    Remove
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>

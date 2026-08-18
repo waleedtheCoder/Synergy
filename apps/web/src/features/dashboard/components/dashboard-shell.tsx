@@ -3,18 +3,32 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, Heart, LayoutGrid, ListChecks, Loader2, Menu, Settings, X } from "lucide-react";
+import {
+  Bell,
+  Bookmark,
+  Heart,
+  LayoutGrid,
+  ListChecks,
+  Loader2,
+  Menu,
+  MessageSquare,
+  Settings,
+  X,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ROUTES } from "@/constants/routes";
 import { useAuthStore } from "@/features/auth/store/auth-store";
 import { UserMenu } from "@/components/layout/site-header";
+import { getChatSocket } from "@/lib/socket";
 import { cn } from "@/lib/utils";
 import { useNotifications } from "../hooks";
 
 const NAV_ITEMS = [
   { href: ROUTES.clientDashboard, label: "Overview", icon: LayoutGrid },
   { href: ROUTES.dashboardRequests, label: "My requests", icon: ListChecks },
+  { href: ROUTES.dashboardMessages, label: "Messages", icon: MessageSquare },
   { href: ROUTES.dashboardFavorites, label: "Favorites", icon: Heart },
+  { href: ROUTES.dashboardSaved, label: "Saved", icon: Bookmark },
   { href: ROUTES.dashboardNotifications, label: "Notifications", icon: Bell },
   { href: ROUTES.dashboardSettings, label: "Settings", icon: Settings },
 ];
@@ -71,6 +85,15 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       router.replace(ROUTES.home);
     }
   }, [isHydrated, user, router]);
+
+  useEffect(() => {
+    if (!isHydrated || !user || user.role !== "CLIENT") return;
+    const socket = getChatSocket();
+    socket.connect();
+    return () => {
+      socket.disconnect();
+    };
+  }, [isHydrated, user]);
 
   if (!isHydrated || !user || user.role !== "CLIENT") {
     return (
