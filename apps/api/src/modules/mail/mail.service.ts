@@ -6,6 +6,11 @@ import {
   passwordResetEmailTemplate,
   verificationEmailTemplate,
 } from './templates/auth-email.templates';
+import {
+  paymentConfirmedEmailTemplate,
+  paymentRejectedEmailTemplate,
+  paymentRefundedEmailTemplate,
+} from './templates/payment-email.templates';
 
 @Injectable()
 export class MailService {
@@ -64,6 +69,48 @@ export class MailService {
     resetUrl: string,
   ): Promise<void> {
     const { subject, html } = passwordResetEmailTemplate(firstName, resetUrl);
+    await this.send(to, subject, html);
+  }
+
+  async sendPaymentConfirmedEmail(
+    to: string,
+    firstName: string,
+    description: string,
+    amount: string,
+  ): Promise<void> {
+    const { subject, html } = paymentConfirmedEmailTemplate(
+      firstName,
+      description,
+      amount,
+    );
+    await this.send(to, subject, html);
+  }
+
+  async sendPaymentRejectedEmail(
+    to: string,
+    firstName: string,
+    description: string,
+    amount: string,
+  ): Promise<void> {
+    const { subject, html } = paymentRejectedEmailTemplate(
+      firstName,
+      description,
+      amount,
+    );
+    await this.send(to, subject, html);
+  }
+
+  async sendPaymentRefundedEmail(
+    to: string,
+    firstName: string,
+    description: string,
+    amount: string,
+  ): Promise<void> {
+    const { subject, html } = paymentRefundedEmailTemplate(
+      firstName,
+      description,
+      amount,
+    );
     await this.send(to, subject, html);
   }
 }

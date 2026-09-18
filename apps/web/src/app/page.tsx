@@ -5,6 +5,7 @@ import { CategoriesSection } from "@/features/landing/components/categories-sect
 import { HowItWorksSection } from "@/features/landing/components/how-it-works-section";
 import { ForProfessionalsSection } from "@/features/landing/components/for-professionals-section";
 import { CtaSection } from "@/features/landing/components/cta-section";
+import { AdSlot } from "@/features/advertising/components/ad-slot";
 
 export default function Home() {
   return (
@@ -14,10 +15,18 @@ export default function Home() {
         <HeroSection />
         <CategoriesSection />
         <HowItWorksSection />
+        <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
+          <AdSlot placement="HOMEPAGE_MIDDLE" />
+        </div>
         <ForProfessionalsSection />
         <CtaSection />
       </main>
       <SiteFooter />
+
+      <AdSlot
+        placement="MOBILE_BANNER"
+        className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-sm border-t border-border/60 bg-background p-2 sm:hidden"
+      />
     </div>
   );
 }

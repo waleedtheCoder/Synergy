@@ -5,6 +5,7 @@ import { ArrowRight, ShieldCheck, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ROUTES } from "@/constants/routes";
+import { AdSlot } from "@/features/advertising/components/ad-slot";
 import { FadeIn } from "./fade-in";
 
 export function HeroSection() {
@@ -54,6 +55,12 @@ export function HeroSection() {
           <div className="mx-auto mt-8 flex items-center justify-center gap-2 text-sm text-muted-foreground">
             <ShieldCheck className="size-4 text-primary" />
             Verified profiles · Secure messaging · No obligation quotes
+          </div>
+        </FadeIn>
+
+        <FadeIn delay={0.25}>
+          <div className="mx-auto mt-10 max-w-2xl">
+            <AdSlot placement="HOMEPAGE_HERO" />
           </div>
         </FadeIn>
       </div>

@@ -21,6 +21,7 @@ import { ProfessionalSearchCard } from "@/features/search/components/professiona
 import type { AvailabilityStatus, SearchSort } from "@/features/search/types";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { cn } from "@/lib/utils";
+import { AdSlot } from "@/features/advertising/components/ad-slot";
 
 const SORT_OPTIONS: { value: SearchSort; label: string }[] = [
   { value: "relevance", label: "Relevance" },
@@ -205,7 +206,8 @@ export default function SearchProfessionalsPage() {
             )}
           </div>
 
-          <div className="mt-8">
+          <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_260px]">
+          <div>
             {isLoading && (
               <div className="flex items-center justify-center py-24">
                 <Loader2 className="size-6 animate-spin text-muted-foreground" />
@@ -244,6 +246,11 @@ export default function SearchProfessionalsPage() {
                 </Button>
               </div>
             )}
+          </div>
+
+          <aside className="hidden lg:block">
+            <AdSlot placement="SEARCH_SIDEBAR" />
+          </aside>
           </div>
         </div>
       </main>

@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/form";
 import { useCreateCertificate } from "../hooks";
 import { certificateSchema, toCertificatePayload, type CertificateInput } from "../schemas";
+import { FileUpload } from "@/features/uploads/components/file-upload";
 
 export function CertificateFormDialog() {
   const [open, setOpen] = useState(false);
@@ -104,9 +105,14 @@ export function CertificateFormDialog() {
               name="fileUrl"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>File URL</FormLabel>
+                  <FormLabel>Certificate file</FormLabel>
                   <FormControl>
-                    <Input placeholder="https://…" {...field} />
+                    <FileUpload
+                      value={field.value ?? ""}
+                      onChange={field.onChange}
+                      accept="image/jpeg,image/png,image/webp,application/pdf"
+                      previewClassName="size-16"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

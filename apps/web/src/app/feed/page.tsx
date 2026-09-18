@@ -15,6 +15,7 @@ import { SiteFooter } from "@/components/layout/site-footer";
 import { useCategories } from "@/features/categories/hooks";
 import { useFeed } from "@/features/feed/hooks";
 import { FeedGrid } from "@/features/feed/components/feed-grid";
+import { AdSlot } from "@/features/advertising/components/ad-slot";
 
 export default function FeedPage() {
   const [page, setPage] = useState(1);
@@ -65,7 +66,14 @@ export default function FeedPage() {
             <p className="py-24 text-center text-muted-foreground">No projects yet.</p>
           )}
 
-          {data && data.items.length > 0 && <FeedGrid projects={data.items} />}
+          {data && data.items.length > 0 && (
+            <>
+              <div className="mb-6 max-w-md">
+                <AdSlot placement="PROJECT_FEED" />
+              </div>
+              <FeedGrid projects={data.items} />
+            </>
+          )}
 
           {data && data.meta.totalPages > 1 && (
             <div className="mt-8 flex items-center justify-center gap-3">

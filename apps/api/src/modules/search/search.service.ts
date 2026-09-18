@@ -5,6 +5,8 @@ import type {
   ResponseTime,
 } from '../../../generated/prisma';
 import { MeilisearchService } from './meilisearch.service';
+import { AnalyticsService } from '../analytics/analytics.service';
+import { AnalyticsEventType } from '../../../generated/prisma';
 import type {
   ProfessionalSortBy,
   SearchProfessionalsDto,
@@ -49,6 +51,7 @@ export class SearchService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly meilisearch: MeilisearchService,
+    private readonly analyticsService: AnalyticsService,
   ) {}
 
   private buildDocument(
@@ -130,6 +133,42 @@ export class SearchService {
     }
   }
 
+  private async getSponsoredDocuments(
+    excludeIds: Set<string>,
+    limit: number,
+  ): Promise<Record<string, unknown>[]> {
+    if (limit <= 0) return [];
+
+    const now = new Date();
+    const listings = await this.prisma.sponsoredListing.findMany({
+      where: {
+        campaign: {
+          status: 'ACTIVE',
+          startDate: { lte: now },
+          endDate: { gte: now },
+        },
+        professionalId: { notIn: Array.from(excludeIds) },
+      },
+      distinct: ['professionalId'],
+      take: limit,
+      select: { professionalId: true },
+    });
+    const professionalIds = listings
+      .map((listing) => listing.professionalId)
+      .filter((id): id is string => id !== null);
+    if (professionalIds.length === 0) return [];
+
+    const profiles = await this.prisma.professionalProfile.findMany({
+      where: { id: { in: professionalIds } },
+      include: PROFILE_INDEX_INCLUDE,
+    });
+
+    return profiles.map((profile) => ({
+      ...this.buildDocument(profile),
+      sponsored: true,
+    }));
+  }
+
   async searchProfessionals(dto: SearchProfessionalsDto) {
     const filters: string[] = [];
     if (dto.categoryId) filters.push(`categoryId = "${dto.categoryId}"`);
@@ -153,8 +192,25 @@ export class SearchService {
 
     const total = result.estimatedTotalHits ?? result.hits.length;
 
+    void this.analyticsService.trackMany(
+      result.hits.map((hit) => String(hit.id)),
+      AnalyticsEventType.SEARCH_APPEARANCE,
+    );
+
+    const organicHits: Record<string, unknown>[] = result.hits.map((hit) => ({
+      ...hit,
+      sponsored: false,
+    }));
+
+    let items = organicHits;
+    if (dto.page === 1) {
+      const organicIds = new Set(organicHits.map((hit) => String(hit.id)));
+      const sponsored = await this.getSponsoredDocuments(organicIds, 2);
+      items = [...sponsored, ...organicHits].slice(0, dto.limit);
+    }
+
     return {
-      items: result.hits,
+      items,
       meta: {
         page: dto.page,
         limit: dto.limit,

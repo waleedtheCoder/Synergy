@@ -4,6 +4,7 @@ export const professionalProfileSchema = z
   .object({
     businessName: z.string().max(150).optional(),
     tagline: z.string().max(150).optional(),
+    coverImageUrl: z.string().optional(),
     about: z.string().max(3000).optional(),
     categoryId: z.string().optional(),
     yearsExperience: z.string().optional(),
@@ -41,6 +42,7 @@ export type ProfessionalProfileInput = z.infer<typeof professionalProfileSchema>
 export interface UpdateProfessionalProfilePayload {
   businessName?: string;
   tagline?: string;
+  coverImageUrl?: string;
   about?: string;
   categoryId?: string;
   yearsExperience?: number;
@@ -58,6 +60,7 @@ export function toUpdateProfessionalProfilePayload(
   return {
     businessName: input.businessName || undefined,
     tagline: input.tagline || undefined,
+    coverImageUrl: input.coverImageUrl || undefined,
     about: input.about || undefined,
     categoryId: input.categoryId || undefined,
     yearsExperience: input.yearsExperience ? Number(input.yearsExperience) : undefined,

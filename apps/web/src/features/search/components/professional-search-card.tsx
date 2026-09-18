@@ -4,6 +4,8 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ROUTES } from "@/constants/routes";
+import { cn } from "@/lib/utils";
+import { recordProfessionalClick } from "@/features/analytics/api";
 import type { ProfessionalSearchHit } from "../types";
 
 function formatRate(min: number | null, max: number | null) {
@@ -18,9 +20,19 @@ export function ProfessionalSearchCard({ hit }: { hit: ProfessionalSearchHit }) 
   const rate = formatRate(hit.hourlyRateMin, hit.hourlyRateMax);
 
   return (
-    <Link href={`${ROUTES.professional}/${hit.slug}`}>
-      <Card className="p-5 transition-shadow hover:shadow-md">
+    <Link
+      href={`${ROUTES.professional}/${hit.slug}`}
+      onClick={() => {
+        recordProfessionalClick(hit.id).catch(() => {});
+      }}
+    >
+      <Card className={cn("p-5 transition-shadow hover:shadow-md", hit.sponsored && "border-primary/40")}>
         <CardContent className="flex flex-col gap-3 p-0">
+          {hit.sponsored && (
+            <Badge variant="outline" className="w-fit text-[10px] tracking-wide uppercase">
+              Sponsored
+            </Badge>
+          )}
           <div className="flex items-center gap-3">
             <Avatar size="lg">
               <AvatarFallback className="bg-accent font-medium text-primary">

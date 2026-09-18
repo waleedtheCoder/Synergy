@@ -1,5 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AnalyticsService } from '../analytics/analytics.service';
+import { AnalyticsEventType } from '../../../generated/prisma';
 
 const PROFILE_INCLUDE = {
   user: { select: { firstName: true, lastName: true, avatarUrl: true } },
@@ -32,7 +34,10 @@ const PROFILE_INCLUDE = {
 
 @Injectable()
 export class ProfessionalsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly analyticsService: AnalyticsService,
+  ) {}
 
   async findBySlug(slug: string) {
     const profile = await this.prisma.professionalProfile.findUnique({
@@ -48,11 +53,30 @@ export class ProfessionalsService {
       where: { id: profile.id },
       data: { profileViewsCount: { increment: 1 } },
     });
+    void this.analyticsService.track(
+      profile.id,
+      AnalyticsEventType.PROFILE_VIEW,
+    );
 
     const { skills, ...rest } = profile;
     return {
       ...rest,
       skills: skills.map((professionalSkill) => professionalSkill.skill),
     };
+  }
+
+  async recordClick(id: string): Promise<void> {
+    const profile = await this.prisma.professionalProfile.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+    if (!profile) {
+      throw new NotFoundException('Professional not found');
+    }
+
+    void this.analyticsService.track(
+      profile.id,
+      AnalyticsEventType.PROFILE_CLICK,
+    );
   }
 }

@@ -19,6 +19,7 @@ import {
 import { PageHeader } from "@/features/dashboard/components/page-header";
 import { useProfile, useUpdateProfile } from "@/features/dashboard/hooks";
 import { updateProfileSchema, type UpdateProfileInput } from "@/features/dashboard/schemas";
+import { FileUpload } from "@/features/uploads/components/file-upload";
 
 export default function SettingsPage() {
   const { data: profile, isLoading } = useProfile();
@@ -26,7 +27,13 @@ export default function SettingsPage() {
 
   const form = useForm<UpdateProfileInput>({
     resolver: zodResolver(updateProfileSchema),
-    defaultValues: { firstName: "", lastName: "", phone: undefined, address: undefined },
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      phone: undefined,
+      address: undefined,
+      avatarUrl: undefined,
+    },
   });
 
   useEffect(() => {
@@ -36,6 +43,7 @@ export default function SettingsPage() {
         lastName: profile.lastName,
         phone: profile.phone ?? undefined,
         address: profile.address ?? undefined,
+        avatarUrl: profile.avatarUrl ?? undefined,
       });
     }
   }, [profile, form]);
@@ -57,6 +65,15 @@ export default function SettingsPage() {
           <div className="mb-5 grid gap-1.5">
             <Label>Email</Label>
             <Input value={profile.email} disabled />
+          </div>
+
+          <div className="mb-5 grid gap-1.5">
+            <Label>Profile photo</Label>
+            <FileUpload
+              value={form.watch("avatarUrl") ?? ""}
+              onChange={(url) => form.setValue("avatarUrl", url, { shouldDirty: true })}
+              previewClassName="size-16"
+            />
           </div>
 
           <Form {...form}>

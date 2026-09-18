@@ -27,6 +27,7 @@ export interface ProfessionalSearchHit {
   ratingCount: number;
   completedProjectsCount: number;
   createdAt: number;
+  sponsored: boolean;
 }
 
 export interface SearchProfessionalsParams {

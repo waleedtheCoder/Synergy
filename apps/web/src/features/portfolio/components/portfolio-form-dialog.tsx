@@ -30,6 +30,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { useCategories } from "@/features/categories/hooks";
+import { FileUpload } from "@/features/uploads/components/file-upload";
 import { useCreatePortfolioProject, useUpdatePortfolioProject } from "../hooks";
 import {
   portfolioProjectSchema,
@@ -200,14 +201,19 @@ export function PortfolioFormDialog({
             <div className="grid gap-2">
               <FormLabel>Images</FormLabel>
               {fields.map((item, index) => (
-                <div key={item.id} className="flex gap-2">
+                <div key={item.id} className="flex items-start gap-2">
                   <FormField
                     control={form.control}
                     name={`images.${index}.url`}
                     render={({ field }) => (
-                      <FormItem className="flex-1">
+                      <FormItem>
                         <FormControl>
-                          <Input placeholder="Image URL" {...field} />
+                          <FileUpload
+                            value={field.value}
+                            onChange={field.onChange}
+                            previewClassName="size-10"
+                            label="Choose"
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

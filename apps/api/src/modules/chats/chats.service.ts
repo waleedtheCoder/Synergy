@@ -6,7 +6,13 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { paginate } from '../../common/dto/pagination-query.dto';
 import type { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
-import { NotificationType, Role, type Prisma } from '../../../generated/prisma';
+import {
+  AnalyticsEventType,
+  NotificationType,
+  Role,
+  type Prisma,
+} from '../../../generated/prisma';
+import { AnalyticsService } from '../analytics/analytics.service';
 import type { CreateChatDto } from './dto/create-chat.dto';
 
 const PARTICIPANT_INCLUDE = {
@@ -44,7 +50,10 @@ export interface ChatContext {
 
 @Injectable()
 export class ChatsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly analyticsService: AnalyticsService,
+  ) {}
 
   async getMyProfileId(userId: string, role: Role): Promise<string> {
     if (role === Role.CLIENT) {
@@ -139,7 +148,7 @@ export class ChatsService {
       });
     }
 
-    return this.prisma.chat.create({
+    const chat = await this.prisma.chat.create({
       data: {
         clientId,
         professionalId,
@@ -147,6 +156,15 @@ export class ChatsService {
       },
       include: PARTICIPANT_INCLUDE,
     });
+
+    if (role === Role.CLIENT) {
+      void this.analyticsService.track(
+        professionalId,
+        AnalyticsEventType.INQUIRY,
+      );
+    }
+
+    return chat;
   }
 
   async findMine(userId: string, role: Role, query: PaginationQueryDto) {

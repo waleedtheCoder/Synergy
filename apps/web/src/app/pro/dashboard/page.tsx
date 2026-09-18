@@ -12,6 +12,7 @@ import { useProfessionalProfile } from "@/features/professional-profile/hooks";
 import { useMyPortfolioProjects } from "@/features/portfolio/hooks";
 import { PortfolioCard } from "@/features/portfolio/components/portfolio-card";
 import { Button } from "@/components/ui/button";
+import { AdSlot } from "@/features/advertising/components/ad-slot";
 
 export default function ProDashboardOverviewPage() {
   const user = useAuthStore((state) => state.user);
@@ -35,6 +36,10 @@ export default function ProDashboardOverviewPage() {
         <StatCard icon={Briefcase} label="Active services" value={profile?.servicesCount ?? 0} />
         <StatCard icon={Images} label="Portfolio projects" value={profile?.portfolioCount ?? 0} />
         <StatCard icon={Bell} label="Unread notifications" value={notifications?.unreadCount ?? 0} />
+      </div>
+
+      <div className="mt-6 max-w-md">
+        <AdSlot placement="DASHBOARD" />
       </div>
 
       <div className="mt-8">

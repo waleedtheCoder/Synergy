@@ -11,6 +11,7 @@ import { EmptyState } from "@/features/dashboard/components/empty-state";
 import { useNotifications, useFavorites } from "@/features/dashboard/hooks";
 import { useMyProjectRequests } from "@/features/project-requests/hooks";
 import { RequestCard } from "@/features/project-requests/components/request-card";
+import { AdSlot } from "@/features/advertising/components/ad-slot";
 
 export default function DashboardOverviewPage() {
   const user = useAuthStore((state) => state.user);
@@ -37,6 +38,10 @@ export default function DashboardOverviewPage() {
         <StatCard icon={ListChecks} label="Open requests" value={requests?.meta.total ?? 0} />
         <StatCard icon={Heart} label="Favorites" value={favorites?.meta.total ?? 0} />
         <StatCard icon={Bell} label="Unread notifications" value={notifications?.unreadCount ?? 0} />
+      </div>
+
+      <div className="mt-6 max-w-md">
+        <AdSlot placement="DASHBOARD" />
       </div>
 
       <div className="mt-8">

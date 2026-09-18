@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/form";
 import { useCategories } from "@/features/categories/hooks";
 import { useSkills } from "@/features/skills/hooks";
+import { FileUpload } from "@/features/uploads/components/file-upload";
 import { cn } from "@/lib/utils";
 import { useProfessionalProfile, useUpdateProfessionalProfile } from "../hooks";
 import {
@@ -57,6 +58,7 @@ export function ProfileForm() {
     defaultValues: {
       businessName: "",
       tagline: "",
+      coverImageUrl: "",
       about: "",
       categoryId: undefined,
       yearsExperience: "",
@@ -74,6 +76,7 @@ export function ProfileForm() {
       form.reset({
         businessName: profile.businessName ?? "",
         tagline: profile.tagline ?? "",
+        coverImageUrl: profile.coverImageUrl ?? "",
         about: profile.about ?? "",
         categoryId: profile.categoryId ?? undefined,
         yearsExperience: profile.yearsExperience?.toString() ?? "",
@@ -106,6 +109,24 @@ export function ProfileForm() {
       <CardContent className="p-0">
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-5">
+            <FormField
+              control={form.control}
+              name="coverImageUrl"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Cover image</FormLabel>
+                  <FormControl>
+                    <FileUpload
+                      value={field.value ?? ""}
+                      onChange={field.onChange}
+                      previewClassName="h-24 w-40"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}

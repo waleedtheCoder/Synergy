@@ -41,4 +41,8 @@ next-env.d.ts
 # docker volumes (local dev data)
 .docker/data/
 
+# local file uploads (dev-only, not real object storage)
+apps/api/uploads/*
+!apps/api/uploads/.gitkeep
+
 .claude

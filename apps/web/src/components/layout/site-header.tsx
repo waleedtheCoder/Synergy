@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Menu, X, LayoutDashboard, LogOut } from "lucide-react";
+import { Menu, X, LayoutDashboard, LogOut, Megaphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -66,6 +66,10 @@ export function UserMenu() {
         <DropdownMenuItem onSelect={() => router.push(dashboardRoute(user.role))}>
           <LayoutDashboard />
           Dashboard
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => router.push(ROUTES.advertiser)}>
+          <Megaphone />
+          Advertise
         </DropdownMenuItem>
         <DropdownMenuItem
           variant="destructive"

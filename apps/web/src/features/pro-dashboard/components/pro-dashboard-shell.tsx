@@ -5,9 +5,11 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Award,
+  BarChart3,
   Bell,
   Bookmark,
   Briefcase,
+  CreditCard,
   Images,
   LayoutGrid,
   Loader2,
@@ -31,6 +33,8 @@ const NAV_ITEMS = [
   { href: ROUTES.proDashboardServices, label: "Services", icon: Briefcase },
   { href: ROUTES.proDashboardPortfolio, label: "Portfolio", icon: Images },
   { href: ROUTES.proDashboardCertificates, label: "Certificates", icon: Award },
+  { href: ROUTES.proDashboardAnalytics, label: "Analytics", icon: BarChart3 },
+  { href: ROUTES.proDashboardBilling, label: "Billing", icon: CreditCard },
   { href: ROUTES.proDashboardMessages, label: "Messages", icon: MessageSquare },
   { href: ROUTES.proDashboardSaved, label: "Saved", icon: Bookmark },
   { href: ROUTES.proDashboardNotifications, label: "Notifications", icon: Bell },

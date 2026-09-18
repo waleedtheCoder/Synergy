@@ -24,6 +24,12 @@ import { MeetingsModule } from './modules/meetings/meetings.module';
 import { FeedModule } from './modules/feed/feed.module';
 import { ProfessionalsModule } from './modules/professionals/professionals.module';
 import { SearchModule } from './modules/search/search.module';
+import { AdminModule } from './modules/admin/admin.module';
+import { AdvertisingModule } from './modules/advertising/advertising.module';
+import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
+import { PaymentsModule } from './modules/payments/payments.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { UploadsModule } from './modules/uploads/uploads.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
@@ -59,6 +65,12 @@ import { AllExceptionsFilter } from './common/filters/http-exception.filter';
     FeedModule,
     ProfessionalsModule,
     SearchModule,
+    AdminModule,
+    AdvertisingModule,
+    SubscriptionsModule,
+    PaymentsModule,
+    AnalyticsModule,
+    UploadsModule,
   ],
   controllers: [AppController],
   providers: [

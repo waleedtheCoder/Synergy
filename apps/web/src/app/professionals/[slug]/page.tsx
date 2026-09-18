@@ -14,6 +14,7 @@ import { useAuthStore } from "@/features/auth/store/auth-store";
 import { useAddFavorite } from "@/features/dashboard/hooks";
 import { useStartChat } from "@/features/chats/hooks";
 import { usePublicProfessional } from "@/features/professionals/hooks";
+import { AdSlot } from "@/features/advertising/components/ad-slot";
 
 const AVAILABILITY_CONFIG = {
   AVAILABLE: { label: "Available", variant: "default" as const },
@@ -214,6 +215,10 @@ export default function PublicProfessionalPage() {
                 </div>
               </div>
             )}
+
+            <div className="mt-10">
+              <AdSlot placement="PROFESSIONAL_PROFILE" />
+            </div>
           </div>
         )}
       </main>
