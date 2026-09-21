@@ -7,6 +7,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { paginate } from '../../common/dto/pagination-query.dto';
 import { CampaignStatus, PaymentStatus } from '../../../generated/prisma';
 import { expireOverdueCampaigns } from '../advertising/campaign-expiry.util';
+import { AdminAuditLogService } from './admin-audit-log.service';
 import type { QueryCampaignsDto } from '../advertising/dto/query-campaigns.dto';
 import type { UpdateCampaignStatusDto } from './dto/update-campaign-status.dto';
 
@@ -21,7 +22,10 @@ const ALLOWED_TRANSITIONS: Record<CampaignStatus, CampaignStatus[]> = {
 
 @Injectable()
 export class AdminCampaignsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLog: AdminAuditLogService,
+  ) {}
 
   async findAll(query: QueryCampaignsDto) {
     await expireOverdueCampaigns(this.prisma);
@@ -50,7 +54,12 @@ export class AdminCampaignsService {
     return paginate(items, total, query);
   }
 
-  async updateStatus(id: string, dto: UpdateCampaignStatusDto) {
+  async updateStatus(
+    id: string,
+    dto: UpdateCampaignStatusDto,
+    adminId: string,
+    ipAddress?: string,
+  ) {
     const campaign = await this.prisma.campaign.findUnique({ where: { id } });
     if (!campaign) {
       throw new NotFoundException('Campaign not found');
@@ -73,9 +82,20 @@ export class AdminCampaignsService {
       }
     }
 
-    return this.prisma.campaign.update({
+    const updated = await this.prisma.campaign.update({
       where: { id },
       data: { status: dto.status },
     });
+
+    await this.auditLog.log({
+      adminId,
+      action: 'campaign.status.update',
+      targetType: 'campaign',
+      targetId: id,
+      metadata: { from: campaign.status, to: dto.status },
+      ipAddress,
+    });
+
+    return updated;
   }
 }

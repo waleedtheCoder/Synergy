@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
+import * as Sentry from '@sentry/nestjs';
 import { Prisma } from '../../../generated/prisma';
 
 interface ErrorBody {
@@ -31,6 +32,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
         `${request.method} ${request.url}`,
         exception instanceof Error ? exception.stack : exception,
       );
+      Sentry.captureException(exception);
     }
 
     response.status(status).json({
@@ -76,13 +78,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
     status: number;
     body: ErrorBody;
   } {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access -- Prisma re-exports this error class via `export import`, which TS can't fully resolve for lint purposes.
     switch (exception.code) {
       case 'P2002':
         return {
           status: HttpStatus.CONFLICT,
           body: {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
             message: `A record with this ${(exception.meta?.target as string[])?.join(', ') ?? 'value'} already exists`,
           },
         };

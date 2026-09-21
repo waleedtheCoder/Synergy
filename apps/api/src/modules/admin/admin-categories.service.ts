@@ -6,14 +6,18 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { slugify } from '../../common/utils/slug.util';
+import { AdminAuditLogService } from './admin-audit-log.service';
 import type { CreateCategoryDto } from './dto/create-category.dto';
 import type { UpdateCategoryDto } from './dto/update-category.dto';
 
 @Injectable()
 export class AdminCategoriesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLog: AdminAuditLogService,
+  ) {}
 
-  async create(dto: CreateCategoryDto) {
+  async create(dto: CreateCategoryDto, adminId: string, ipAddress?: string) {
     const slug = slugify(dto.name);
     const existing = await this.prisma.category.findUnique({
       where: { slug },
@@ -26,7 +30,7 @@ export class AdminCategoriesService {
       await this.assertParentExists(dto.parentId);
     }
 
-    return this.prisma.category.create({
+    const created = await this.prisma.category.create({
       data: {
         name: dto.name,
         slug,
@@ -34,9 +38,25 @@ export class AdminCategoriesService {
         parentId: dto.parentId,
       },
     });
+
+    await this.auditLog.log({
+      adminId,
+      action: 'category.create',
+      targetType: 'category',
+      targetId: created.id,
+      metadata: { name: dto.name },
+      ipAddress,
+    });
+
+    return created;
   }
 
-  async update(id: string, dto: UpdateCategoryDto) {
+  async update(
+    id: string,
+    dto: UpdateCategoryDto,
+    adminId: string,
+    ipAddress?: string,
+  ) {
     const category = await this.prisma.category.findUnique({ where: { id } });
     if (!category) {
       throw new NotFoundException('Category not found');
@@ -49,7 +69,7 @@ export class AdminCategoriesService {
       await this.assertParentExists(dto.parentId);
     }
 
-    return this.prisma.category.update({
+    const updated = await this.prisma.category.update({
       where: { id },
       data: {
         name: dto.name,
@@ -58,9 +78,20 @@ export class AdminCategoriesService {
         ...(dto.name ? { slug: slugify(dto.name) } : {}),
       },
     });
+
+    await this.auditLog.log({
+      adminId,
+      action: 'category.update',
+      targetType: 'category',
+      targetId: id,
+      metadata: { name: dto.name },
+      ipAddress,
+    });
+
+    return updated;
   }
 
-  async remove(id: string) {
+  async remove(id: string, adminId: string, ipAddress?: string) {
     const category = await this.prisma.category.findUnique({
       where: { id },
       include: { children: { select: { id: true } } },
@@ -75,6 +106,14 @@ export class AdminCategoriesService {
     }
 
     await this.prisma.category.delete({ where: { id } });
+    await this.auditLog.log({
+      adminId,
+      action: 'category.delete',
+      targetType: 'category',
+      targetId: id,
+      metadata: { name: category.name },
+      ipAddress,
+    });
   }
 
   private async assertParentExists(parentId: string): Promise<void> {

@@ -37,4 +37,6 @@ export const ROUTES = {
   adminPayments: "/admin/payments",
   adminAnalytics: "/admin/analytics",
   advertiser: "/advertiser",
+  privacy: "/privacy",
+  terms: "/terms",
 } as const;

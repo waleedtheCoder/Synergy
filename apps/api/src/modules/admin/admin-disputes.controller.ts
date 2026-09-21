@@ -5,11 +5,14 @@ import {
   Param,
   Patch,
   Query,
+  Req,
   UseInterceptors,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Request } from 'express';
 import { TransformInterceptor } from '../../common/interceptors/transform.interceptor';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Role } from '../../../generated/prisma';
 import { AdminDisputesService } from './admin-disputes.service';
 import { QueryDisputesDto } from './dto/query-disputes.dto';
@@ -30,7 +33,12 @@ export class AdminDisputesController {
 
   @Patch(':id')
   @ApiOperation({ summary: 'Update dispute status / add resolution notes' })
-  resolve(@Param('id') id: string, @Body() dto: ResolveDisputeDto) {
-    return this.adminDisputesService.resolve(id, dto);
+  resolve(
+    @Param('id') id: string,
+    @Body() dto: ResolveDisputeDto,
+    @CurrentUser('id') adminId: string,
+    @Req() req: Request,
+  ) {
+    return this.adminDisputesService.resolve(id, dto, adminId, req.ip);
   }
 }

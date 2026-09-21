@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString, MaxLength, MinLength } from 'class-validator';
+import { StripHtml } from '../../../common/decorators/strip-html.decorator';
 
 export class SendMessageDto {
   @ApiProperty()
@@ -7,6 +8,7 @@ export class SendMessageDto {
   chatId: string;
 
   @ApiProperty({ minLength: 1, maxLength: 5000 })
+  @StripHtml()
   @IsString()
   @MinLength(1)
   @MaxLength(5000)

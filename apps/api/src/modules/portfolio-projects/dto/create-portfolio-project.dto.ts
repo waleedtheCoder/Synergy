@@ -13,9 +13,11 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { PortfolioMediaDto } from './portfolio-media.dto';
+import { StripHtml } from '../../../common/decorators/strip-html.decorator';
 
 export class CreatePortfolioProjectDto {
   @ApiProperty({ minLength: 3, maxLength: 150 })
+  @StripHtml()
   @IsString()
   @MinLength(3)
   @MaxLength(150)
@@ -23,6 +25,7 @@ export class CreatePortfolioProjectDto {
 
   @ApiPropertyOptional({ maxLength: 3000 })
   @IsOptional()
+  @StripHtml()
   @IsString()
   @MaxLength(3000)
   description?: string;
@@ -34,6 +37,7 @@ export class CreatePortfolioProjectDto {
 
   @ApiPropertyOptional({ maxLength: 255 })
   @IsOptional()
+  @StripHtml()
   @IsString()
   @MaxLength(255)
   location?: string;

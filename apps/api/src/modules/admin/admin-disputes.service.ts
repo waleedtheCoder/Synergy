@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { paginate } from '../../common/dto/pagination-query.dto';
 import { DisputeStatus } from '../../../generated/prisma';
+import { AdminAuditLogService } from './admin-audit-log.service';
 import type { QueryDisputesDto } from './dto/query-disputes.dto';
 import type { ResolveDisputeDto } from './dto/resolve-dispute.dto';
 
@@ -11,7 +12,10 @@ const PARTY_SELECT = {
 
 @Injectable()
 export class AdminDisputesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLog: AdminAuditLogService,
+  ) {}
 
   async findAll(query: QueryDisputesDto) {
     const where = query.status ? { status: query.status } : {};
@@ -30,7 +34,12 @@ export class AdminDisputesService {
     return paginate(items, total, query);
   }
 
-  async resolve(id: string, dto: ResolveDisputeDto) {
+  async resolve(
+    id: string,
+    dto: ResolveDisputeDto,
+    adminId: string,
+    ipAddress?: string,
+  ) {
     const dispute = await this.prisma.dispute.findUnique({ where: { id } });
     if (!dispute) {
       throw new NotFoundException('Dispute not found');
@@ -40,7 +49,7 @@ export class AdminDisputesService {
       dto.status === DisputeStatus.RESOLVED ||
       dto.status === DisputeStatus.REJECTED;
 
-    return this.prisma.dispute.update({
+    const updated = await this.prisma.dispute.update({
       where: { id },
       data: {
         status: dto.status,
@@ -48,5 +57,16 @@ export class AdminDisputesService {
         resolvedAt: isFinal ? new Date() : null,
       },
     });
+
+    await this.auditLog.log({
+      adminId,
+      action: 'dispute.resolve',
+      targetType: 'dispute',
+      targetId: id,
+      metadata: { from: dispute.status, to: dto.status },
+      ipAddress,
+    });
+
+    return updated;
   }
 }

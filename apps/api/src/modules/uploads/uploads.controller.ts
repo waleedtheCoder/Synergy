@@ -7,9 +7,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { diskStorage } from 'multer';
 import { randomUUID } from 'crypto';
-import { extname } from 'path';
 import { TransformInterceptor } from '../../common/interceptors/transform.interceptor';
 import { UploadsService } from './uploads.service';
 
@@ -33,14 +31,12 @@ export class UploadsController {
   @ApiOperation({ summary: 'Upload an image or PDF, get back its URL' })
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: diskStorage({
-        destination: UploadsService.UPLOAD_DIR,
-        filename: (_req, file, callback) => {
-          callback(null, `${randomUUID()}${extname(file.originalname)}`);
-        },
-      }),
       limits: { fileSize: MAX_FILE_SIZE_BYTES },
       fileFilter: (_req, file, callback) => {
+        // Declared-type check happens here for a fast client-facing error
+        // message; the service re-derives the real type from file content
+        // and is the actual source of truth, since this declared MIME type
+        // is fully attacker-controlled.
         if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
           callback(
             new BadRequestException(
@@ -54,10 +50,11 @@ export class UploadsController {
       },
     }),
   )
-  upload(@UploadedFile() file: Express.Multer.File) {
+  async upload(@UploadedFile() file: Express.Multer.File) {
     if (!file) {
       throw new BadRequestException('No file provided');
     }
-    return { url: this.uploadsService.buildUrl(file.filename) };
+    const url = await this.uploadsService.upload(randomUUID(), file.buffer);
+    return { url };
   }
 }

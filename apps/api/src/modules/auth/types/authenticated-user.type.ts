@@ -7,4 +7,5 @@ export interface AuthenticatedUser {
   firstName: string;
   lastName: string;
   emailVerified: boolean;
+  twoFactorEnabled: boolean;
 }

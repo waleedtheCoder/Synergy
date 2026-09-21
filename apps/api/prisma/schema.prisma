@@ -210,6 +210,18 @@ model User {
   createdAt       DateTime     @default(now()) @map("created_at")
   updatedAt       DateTime     @updatedAt @map("updated_at")
 
+  // ── Account lockout (brute-force protection beyond IP rate limiting) ──
+  failedLoginAttempts Int       @default(0) @map("failed_login_attempts")
+  lockedUntil         DateTime? @map("locked_until")
+
+  // ── TOTP two-factor authentication ─────────────────────────────────
+  twoFactorEnabled       Boolean  @default(false) @map("two_factor_enabled")
+  twoFactorSecret        String?  @map("two_factor_secret")
+  twoFactorRecoveryCodes String[] @map("two_factor_recovery_codes")
+
+  // ── Account deletion (GDPR-style self-service, soft delete) ────────
+  deletedAt DateTime? @map("deleted_at")
+
   clientProfile       ClientProfile?
   professionalProfile ProfessionalProfile?
   refreshTokens       RefreshToken[]
@@ -227,6 +239,7 @@ model User {
   projectLikes        ProjectLike[]
   projectBookmarks    ProjectBookmark[]
   comments            Comment[]
+  adminAuditLogs      AdminAuditLog[]
 
   @@map("users")
 }
@@ -259,6 +272,22 @@ model VerificationToken {
 
   @@index([userId, type])
   @@map("verification_tokens")
+}
+
+model AdminAuditLog {
+  id         String   @id @default(cuid())
+  adminId    String   @map("admin_id")
+  admin      User     @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  action     String
+  targetType String   @map("target_type")
+  targetId   String?  @map("target_id")
+  metadata   Json?
+  ipAddress  String?  @map("ip_address")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([adminId])
+  @@index([targetType, targetId])
+  @@map("admin_audit_logs")
 }
 
 // ────────────────────────────────────────────────────────────────────────

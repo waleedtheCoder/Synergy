@@ -11,6 +11,10 @@ const FOOTER_LINKS = {
     { label: "Join Synergi", href: `${ROUTES.register}?role=PROFESSIONAL` },
     { label: "For professionals", href: "#for-professionals" },
   ],
+  Legal: [
+    { label: "Privacy Policy", href: ROUTES.privacy },
+    { label: "Terms of Service", href: ROUTES.terms },
+  ],
 };
 
 export function SiteFooter() {

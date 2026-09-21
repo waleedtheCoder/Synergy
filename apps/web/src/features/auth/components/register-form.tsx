@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { ROUTES } from "@/constants/routes";
 import { useRegister } from "../hooks";
 import { registerSchema, type RegisterInput } from "../schemas";
+import { GoogleAuthButton } from "./google-auth-button";
 
 const ROLE_OPTIONS = [
   {
@@ -65,6 +66,8 @@ export function RegisterForm() {
       onSuccess: () => router.push(ROUTES.home),
     });
   }
+
+  const selectedRole = form.watch("role");
 
   return (
     <Card>
@@ -177,6 +180,12 @@ export function RegisterForm() {
             </Button>
           </form>
         </Form>
+        <div className="my-4 flex items-center gap-3">
+          <div className="h-px flex-1 bg-border" />
+          <span className="text-xs text-muted-foreground">or</span>
+          <div className="h-px flex-1 bg-border" />
+        </div>
+        <GoogleAuthButton role={selectedRole} />
         <p className="mt-6 text-center text-sm text-muted-foreground">
           Already have an account?{" "}
           <Link href={ROUTES.login} className="font-medium text-primary hover:underline">

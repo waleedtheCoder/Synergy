@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   Logger,
@@ -9,10 +10,16 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import type jwt from 'jsonwebtoken';
+import { generateSecret, generateURI, verify as verifyOtp } from 'otplib';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { SearchService } from '../search/search.service';
-import { generateRawToken, hashToken } from '../../common/utils/crypto.util';
+import {
+  decryptField,
+  encryptField,
+  generateRawToken,
+  hashToken,
+} from '../../common/utils/crypto.util';
 import { uniqueSlug } from '../../common/utils/slug.util';
 import {
   AuthProvider,
@@ -30,6 +37,9 @@ import type { RequestMeta, TokenPair } from './types/token-pair.type';
 import type { GoogleProfilePayload } from './strategies/google.strategy';
 
 const BCRYPT_ROUNDS = 12;
+const MAX_FAILED_LOGIN_ATTEMPTS = 10;
+const LOCKOUT_DURATION_MS = 15 * 60 * 1000;
+const RECOVERY_CODE_COUNT = 10;
 
 @Injectable()
 export class AuthService {
@@ -117,18 +127,65 @@ export class AuthService {
       throw new UnauthorizedException('This account is no longer active');
     }
 
+    if (user.lockedUntil && user.lockedUntil > new Date()) {
+      throw new UnauthorizedException(
+        'Too many failed login attempts. Please try again in 15 minutes.',
+      );
+    }
+
     const matches = await bcrypt.compare(password, user.passwordHash);
     if (!matches) {
+      await this.registerFailedLoginAttempt(user.id, user.failedLoginAttempts);
       throw new UnauthorizedException('Invalid email or password');
+    }
+
+    if (user.failedLoginAttempts > 0 || user.lockedUntil) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { failedLoginAttempts: 0, lockedUntil: null },
+      });
     }
 
     return this.toAuthenticatedUser(user);
   }
 
+  private async registerFailedLoginAttempt(
+    userId: string,
+    currentAttempts: number,
+  ): Promise<void> {
+    const attempts = currentAttempts + 1;
+    const lockingOut = attempts >= MAX_FAILED_LOGIN_ATTEMPTS;
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: lockingOut
+        ? {
+            failedLoginAttempts: 0,
+            lockedUntil: new Date(Date.now() + LOCKOUT_DURATION_MS),
+          }
+        : { failedLoginAttempts: attempts },
+    });
+  }
+
   async login(
     user: AuthenticatedUser,
     meta: RequestMeta,
+    otpCode?: string,
   ): Promise<{ user: AuthenticatedUser } & TokenPair> {
+    if (user.twoFactorEnabled) {
+      await this.verifyTwoFactorOrThrow(user.id, otpCode);
+    }
+
+    const seenBefore = meta.userAgent
+      ? await this.prisma.refreshToken.findFirst({
+          where: {
+            userId: user.id,
+            userAgent: meta.userAgent,
+            ipAddress: meta.ipAddress,
+          },
+        })
+      : null;
+
     await this.prisma.user.update({
       where: { id: user.id },
       data: { lastLoginAt: new Date() },
@@ -140,7 +197,203 @@ export class AuthService {
       user.role,
       meta,
     );
+
+    if (!seenBefore) {
+      void this.mail
+        .sendNewLoginAlertEmail(
+          user.email,
+          user.firstName,
+          meta.userAgent,
+          meta.ipAddress,
+        )
+        .catch((error: unknown) =>
+          this.logger.error('Failed to send new-login alert', error),
+        );
+    }
+
     return { user, ...tokens };
+  }
+
+  // ── Two-factor authentication (TOTP) ────────────────────────────────
+
+  private getEncryptionKey(): string {
+    return this.config.getOrThrow<string>('ENCRYPTION_KEY');
+  }
+
+  // otplib throws on malformed input (e.g. a 10-char recovery code) instead
+  // of returning { valid: false }, so callers wrap it to get a clean bool.
+  private async tryVerifyTotp(secret: string, token: string): Promise<boolean> {
+    try {
+      const result = await verifyOtp({ secret, token });
+      return result.valid;
+    } catch {
+      return false;
+    }
+  }
+
+  private async verifyTwoFactorOrThrow(
+    userId: string,
+    code: string | undefined,
+  ): Promise<void> {
+    if (!code) {
+      throw new UnauthorizedException('Two-factor code required');
+    }
+
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user?.twoFactorSecret) {
+      throw new UnauthorizedException(
+        'Two-factor authentication is not configured',
+      );
+    }
+
+    const secret = decryptField(user.twoFactorSecret, this.getEncryptionKey());
+    const isValidTotp = await this.tryVerifyTotp(secret, code);
+    if (isValidTotp) {
+      return;
+    }
+
+    const hashedInput = hashToken(code.trim().toUpperCase());
+    const matchIndex = user.twoFactorRecoveryCodes.indexOf(hashedInput);
+    if (matchIndex === -1) {
+      throw new UnauthorizedException('Invalid two-factor code');
+    }
+
+    const remaining = [...user.twoFactorRecoveryCodes];
+    remaining.splice(matchIndex, 1);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { twoFactorRecoveryCodes: remaining },
+    });
+  }
+
+  async setupTwoFactor(
+    userId: string,
+    email: string,
+  ): Promise<{ secret: string; otpauthUrl: string }> {
+    const secret = generateSecret();
+    const encrypted = encryptField(secret, this.getEncryptionKey());
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { twoFactorSecret: encrypted, twoFactorEnabled: false },
+    });
+
+    const otpauthUrl = generateURI({
+      issuer: 'Synergi',
+      label: email,
+      secret,
+    });
+
+    return { secret, otpauthUrl };
+  }
+
+  async confirmTwoFactor(
+    userId: string,
+    code: string,
+  ): Promise<{ recoveryCodes: string[] }> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user?.twoFactorSecret) {
+      throw new BadRequestException(
+        'Start two-factor setup before confirming it',
+      );
+    }
+
+    const secret = decryptField(user.twoFactorSecret, this.getEncryptionKey());
+    if (!(await this.tryVerifyTotp(secret, code))) {
+      throw new UnauthorizedException('Invalid two-factor code');
+    }
+
+    const recoveryCodes = Array.from({ length: RECOVERY_CODE_COUNT }, () =>
+      generateRawToken().slice(0, 10).toUpperCase(),
+    );
+    const hashedCodes = recoveryCodes.map((rc) => hashToken(rc));
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        twoFactorEnabled: true,
+        twoFactorRecoveryCodes: hashedCodes,
+      },
+    });
+
+    return { recoveryCodes };
+  }
+
+  async disableTwoFactor(
+    userId: string,
+    password: string,
+    code: string,
+  ): Promise<void> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (
+      !user?.passwordHash ||
+      !(await bcrypt.compare(password, user.passwordHash))
+    ) {
+      throw new UnauthorizedException('Invalid password');
+    }
+
+    await this.verifyTwoFactorOrThrow(userId, code);
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        twoFactorEnabled: false,
+        twoFactorSecret: null,
+        twoFactorRecoveryCodes: [],
+      },
+    });
+  }
+
+  // ── Active sessions ──────────────────────────────────────────────────
+
+  async listSessions(userId: string, currentRawToken: string | undefined) {
+    const currentHash = currentRawToken ? hashToken(currentRawToken) : null;
+    const sessions = await this.prisma.refreshToken.findMany({
+      where: { userId, revokedAt: null, expiresAt: { gt: new Date() } },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        userAgent: true,
+        ipAddress: true,
+        createdAt: true,
+        expiresAt: true,
+        tokenHash: true,
+      },
+    });
+
+    return sessions.map(({ tokenHash, ...session }) => ({
+      ...session,
+      isCurrent: tokenHash === currentHash,
+    }));
+  }
+
+  async revokeSession(userId: string, sessionId: string): Promise<void> {
+    const session = await this.prisma.refreshToken.findUnique({
+      where: { id: sessionId },
+    });
+    if (!session || session.userId !== userId) {
+      throw new UnauthorizedException('Session not found');
+    }
+
+    await this.prisma.refreshToken.update({
+      where: { id: sessionId },
+      data: { revokedAt: new Date() },
+    });
+  }
+
+  async revokeAllOtherSessions(
+    userId: string,
+    currentRawToken: string | undefined,
+  ): Promise<void> {
+    const currentHash = currentRawToken ? hashToken(currentRawToken) : null;
+    await this.prisma.refreshToken.updateMany({
+      where: {
+        userId,
+        revokedAt: null,
+        ...(currentHash ? { tokenHash: { not: currentHash } } : {}),
+      },
+      data: { revokedAt: new Date() },
+    });
   }
 
   // ── Google OAuth ─────────────────────────────────────────────────────
@@ -365,10 +618,10 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
 
-    await this.prisma.$transaction([
+    const [user] = await this.prisma.$transaction([
       this.prisma.user.update({
         where: { id: record.userId },
-        data: { passwordHash },
+        data: { passwordHash, failedLoginAttempts: 0, lockedUntil: null },
       }),
       this.prisma.verificationToken.update({
         where: { id: record.id },
@@ -379,6 +632,12 @@ export class AuthService {
         data: { revokedAt: new Date() },
       }),
     ]);
+
+    void this.mail
+      .sendPasswordChangedEmail(user.email, user.firstName)
+      .catch((error: unknown) =>
+        this.logger.error('Failed to send password-changed alert', error),
+      );
   }
 
   // ── Shared helpers ───────────────────────────────────────────────────
@@ -438,6 +697,7 @@ export class AuthService {
     firstName: string;
     lastName: string;
     emailVerified: boolean;
+    twoFactorEnabled?: boolean;
   }): AuthenticatedUser {
     return {
       id: user.id,
@@ -446,6 +706,7 @@ export class AuthService {
       firstName: user.firstName,
       lastName: user.lastName,
       emailVerified: user.emailVerified,
+      twoFactorEnabled: user.twoFactorEnabled ?? false,
     };
   }
 }

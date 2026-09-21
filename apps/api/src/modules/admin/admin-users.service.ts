@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { paginate } from '../../common/dto/pagination-query.dto';
+import { AdminAuditLogService } from './admin-audit-log.service';
 import type { QueryUsersDto } from './dto/query-users.dto';
 import type { UpdateUserStatusDto } from './dto/update-user-status.dto';
 
@@ -19,7 +20,10 @@ const USER_LIST_SELECT = {
 
 @Injectable()
 export class AdminUsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLog: AdminAuditLogService,
+  ) {}
 
   async findAll(query: QueryUsersDto) {
     const where = {
@@ -84,16 +88,32 @@ export class AdminUsersService {
     return user;
   }
 
-  async updateStatus(id: string, dto: UpdateUserStatusDto) {
+  async updateStatus(
+    id: string,
+    dto: UpdateUserStatusDto,
+    adminId: string,
+    ipAddress?: string,
+  ) {
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
-    return this.prisma.user.update({
+    const updated = await this.prisma.user.update({
       where: { id },
       data: { status: dto.status },
       select: USER_LIST_SELECT,
     });
+
+    await this.auditLog.log({
+      adminId,
+      action: 'user.status.update',
+      targetType: 'user',
+      targetId: id,
+      metadata: { from: user.status, to: dto.status },
+      ipAddress,
+    });
+
+    return updated;
   }
 }

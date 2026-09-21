@@ -20,6 +20,8 @@ import { AdminCampaignsService } from './admin-campaigns.service';
 import { AdminPaymentsController } from './admin-payments.controller';
 import { AdminPaymentsService } from './admin-payments.service';
 import { AdminAnalyticsController } from './admin-analytics.controller';
+import { AdminAuditLogService } from './admin-audit-log.service';
+import { AdminAuditLogController } from './admin-audit-log.controller';
 
 @Module({
   imports: [SearchModule, AnalyticsModule],
@@ -34,8 +36,10 @@ import { AdminAnalyticsController } from './admin-analytics.controller';
     AdminCampaignsController,
     AdminPaymentsController,
     AdminAnalyticsController,
+    AdminAuditLogController,
   ],
   providers: [
+    AdminAuditLogService,
     AdminStatsService,
     AdminUsersService,
     AdminVerificationService,

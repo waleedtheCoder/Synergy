@@ -27,6 +27,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 
     if (
       !user ||
+      user.deletedAt ||
       user.status === UserStatus.SUSPENDED ||
       user.status === UserStatus.DEACTIVATED
     ) {
@@ -40,6 +41,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       firstName: user.firstName,
       lastName: user.lastName,
       emailVerified: user.emailVerified,
+      twoFactorEnabled: user.twoFactorEnabled,
     };
   }
 }
