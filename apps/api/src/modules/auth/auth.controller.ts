@@ -194,7 +194,11 @@ export class AuthController {
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: Confirm2faDto,
   ) {
-    const result = await this.authService.confirmTwoFactor(user.id, dto.code);
+    const result = await this.authService.confirmTwoFactor(
+      user.id,
+      dto.code,
+      dto.password,
+    );
     return { success: true, data: result };
   }
 

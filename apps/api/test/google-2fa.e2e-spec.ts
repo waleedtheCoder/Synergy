@@ -79,7 +79,8 @@ describe('Google OAuth + 2FA completion (e2e)', () => {
     await request(server)
       .post('/api/v1/auth/2fa/confirm')
       .set('Authorization', `Bearer ${accessToken}`)
-      .send({ code: firstCode });
+      .send({ code: firstCode, password: client.password })
+      .expect(200);
   });
 
   afterAll(async () => {
@@ -127,5 +128,67 @@ describe('Google OAuth + 2FA completion (e2e)', () => {
       .post('/api/v1/auth/google/complete-2fa')
       .send({ pendingToken: accessToken, otpCode: '000000' })
       .expect(401);
+  });
+
+  // Confirming 2FA enrollment requires the account password, same as
+  // disabling it does — otherwise a hijacked short-lived access token could
+  // silently enroll 2FA with an attacker's own secret. Uses its own
+  // throwaway user rather than the shared one above, which is already past
+  // the confirm step by the time these run.
+  it('requires the correct password to confirm 2FA enrollment', async () => {
+    const server = app.getHttpServer();
+    const stepUpClient = {
+      email: `sec-2fa-stepup-${runId}@synergi.dev`,
+      password: 'SecTestPass123!',
+    };
+
+    const registered = await request(server)
+      .post('/api/v1/auth/register')
+      .send({
+        ...stepUpClient,
+        firstName: 'Sec',
+        lastName: 'StepUp',
+        role: 'CLIENT',
+      });
+    const stepUpToken = (
+      registered.body as ApiEnvelope<{ accessToken: string }>
+    ).data.accessToken;
+
+    const setup = await request(server)
+      .post('/api/v1/auth/2fa/setup')
+      .set('Authorization', `Bearer ${stepUpToken}`)
+      .send();
+    const { otpauthUrl } = (setup.body as ApiEnvelope<{ otpauthUrl: string }>)
+      .data;
+    const secret = new URL(otpauthUrl).searchParams.get('secret') ?? '';
+
+    await request(server)
+      .post('/api/v1/auth/2fa/confirm')
+      .set('Authorization', `Bearer ${stepUpToken}`)
+      .send({ code: await generateTotp({ secret }) })
+      .expect(401);
+
+    await request(server)
+      .post('/api/v1/auth/2fa/confirm')
+      .set('Authorization', `Bearer ${stepUpToken}`)
+      .send({
+        code: await generateTotp({ secret }),
+        password: 'wrong-password',
+      })
+      .expect(401);
+
+    await request(server)
+      .post('/api/v1/auth/2fa/confirm')
+      .set('Authorization', `Bearer ${stepUpToken}`)
+      .send({
+        code: await generateTotp({ secret }),
+        password: stepUpClient.password,
+      })
+      .expect(200);
+
+    await request(server)
+      .delete('/api/v1/users/me')
+      .set('Authorization', `Bearer ${stepUpToken}`)
+      .send({ password: stepUpClient.password });
   });
 });

@@ -343,12 +343,26 @@ export class AuthService {
   async confirmTwoFactor(
     userId: string,
     code: string,
+    password?: string,
   ): Promise<{ recoveryCodes: string[] }> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user?.twoFactorSecret) {
       throw new BadRequestException(
         'Start two-factor setup before confirming it',
       );
+    }
+
+    // Mirrors disableTwoFactor's step-up check: confirming (i.e. actually
+    // turning on) 2FA is as security-relevant as turning it off, so it
+    // deserves the same re-authentication — otherwise a hijacked short-lived
+    // access token could silently enroll 2FA with an attacker-controlled
+    // secret and lock the real owner out. Skipped only for accounts with no
+    // password at all (Google-only sign-in) since there's nothing to check —
+    // the OTP code itself is still required either way.
+    if (user.passwordHash) {
+      if (!password || !(await bcrypt.compare(password, user.passwordHash))) {
+        throw new UnauthorizedException('Invalid password');
+      }
     }
 
     const secret = decryptField(user.twoFactorSecret, this.getEncryptionKey());

@@ -36,10 +36,13 @@ source, not re-assumed.)
        encrypted at rest (AES-256-GCM, crypto.util.ts). ADMIN accounts are now
        required to have 2FA enabled before accessing any admin-only resource
        (enforced in common/guards/roles.guard.ts, added this pass — see section 15).
-       Known gap: Google-OAuth login for an account with 2FA already enabled
-       currently fails closed (401) instead of prompting for the code — a
-       functional bug to fix, not a security hole (found during this session's
-       code review).
+       Google-OAuth login for a 2FA-enabled account now works properly: the
+       callback hands back a short-lived "pending2fa" token (signed with
+       ENCRYPTION_KEY, not JWT_ACCESS_SECRET, so it can never be accepted as a
+       real bearer token even if leaked) instead of failing closed, and the
+       web app's callback page prompts for the code, exchanging it via
+       POST /auth/google/complete-2fa. Covered by
+       apps/api/test/google-2fa.e2e-spec.ts.
 [DONE] Session list + per-session revocation (auth.service.ts listSessions/
        revokeSession/revokeAllOtherSessions) — ownership-checked, no IDOR.
 [DONE] Email alerts exist for new-login and password-changed events
@@ -330,10 +333,19 @@ source, not re-assumed.)
        throws 403 for an admin whose twoFactorEnabled is false. This doesn't
        block login or 2FA enrollment itself (those routes carry no @Roles
        decorator), so a fresh admin can always log in and set up 2FA — no
-       lockout risk. One asymmetry worth a follow-up: enabling 2FA doesn't itself
-       require password re-confirmation the way disabling it does (found during
-       this session's code review; low severity, only matters if a session is
-       already compromised).
+       lockout risk. Confirming 2FA enrollment now also requires password
+       re-confirmation, matching disableTwoFactor — closes the asymmetry
+       flagged in this session's code review (skipped only for accounts with
+       no password at all, i.e. Google-only sign-in, since there's nothing to
+       check; the OTP code itself is still required regardless). Covered by
+       apps/api/test/google-2fa.e2e-spec.ts.
+[MISSING] 2FA has no frontend UI at all — every 2FA endpoint (setup, confirm,
+       disable) is backend-only, reachable only via direct API calls (Swagger,
+       curl, etc.), not through the actual web app. No real user can currently
+       turn 2FA on for their own account. Worth flagging clearly: the ADMIN-
+       required-2FA enforcement above means a fresh admin account is
+       technically locked out of admin routes until *someone* calls these
+       endpoints directly on their behalf, since there's no settings page yet.
 [MISSING] No IP allow-listing option for admin routes. Infra-level control
        (reverse proxy or WAF rule), not something to build in application code.
 
@@ -433,15 +445,13 @@ impact vs effort:
   1. Expand security.e2e-spec.ts's IDOR coverage beyond project-requests to every
      resource controller with an ownership check (section 2/20) — the pattern is
      proven, it's now a matter of repeating it.
-  2. Fix the Google-OAuth-login + 2FA-enabled interaction, which currently fails
-     closed with a confusing 401 instead of prompting for the code (section 1).
-  3. TLS/HSTS termination + real production NODE_ENV wherever this deploys
+  2. TLS/HSTS termination + real production NODE_ENV wherever this deploys
      (sections 4 & 18) — the app-side header logic is ready, it just needs real
      HTTPS in front of it.
-  4. A written incident-response runbook (section 14) — deliberately not drafted
+  3. A written incident-response runbook (section 14) — deliberately not drafted
      here since it needs org-specific details (who's on call, who has authority
      to rotate secrets/revoke sessions in a real incident) that only you can fill
      in; happy to draft a starting skeleton if useful.
-  5. Legal review of the privacy/terms pages before any real users see them
+  4. Legal review of the privacy/terms pages before any real users see them
      (section 19) — still template content, and no registered company exists
      yet to fill in the real business details, so this was skipped this pass.
