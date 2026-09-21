@@ -41,6 +41,10 @@ export const envSchema = z.object({
 
   SENTRY_DSN: z.string().optional(),
 
+  // Unset disables CAPTCHA verification entirely (see TurnstileService) —
+  // useful for local dev/CI where no Cloudflare account is configured.
+  TURNSTILE_SECRET_KEY: z.string().optional(),
+
   THROTTLE_TTL: z.coerce.number().default(60000),
   THROTTLE_LIMIT: z.coerce.number().default(100),
 });

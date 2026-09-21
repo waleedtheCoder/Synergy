@@ -18,4 +18,9 @@ export class LoginDto {
   @IsOptional()
   @IsString()
   otpCode?: string;
+
+  @ApiPropertyOptional({ description: 'Cloudflare Turnstile response token' })
+  @IsOptional()
+  @IsString()
+  turnstileToken?: string;
 }

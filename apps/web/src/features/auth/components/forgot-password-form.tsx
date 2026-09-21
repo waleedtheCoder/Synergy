@@ -21,6 +21,8 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { TurnstileWidget } from "@/components/turnstile-widget";
+import { env } from "@/lib/env";
 import { ROUTES } from "@/constants/routes";
 import { useForgotPassword } from "../hooks";
 import { forgotPasswordSchema, type ForgotPasswordInput } from "../schemas";
@@ -29,8 +31,10 @@ export function ForgotPasswordForm() {
   const forgotPassword = useForgotPassword();
   const form = useForm<ForgotPasswordInput>({
     resolver: zodResolver(forgotPasswordSchema),
-    defaultValues: { email: "" },
+    defaultValues: { email: "", turnstileToken: "" },
   });
+  const turnstileToken = form.watch("turnstileToken");
+  const needsCaptcha = Boolean(env.NEXT_PUBLIC_TURNSTILE_SITE_KEY);
 
   function onSubmit(values: ForgotPasswordInput) {
     forgotPassword.mutate(values);
@@ -75,7 +79,15 @@ export function ForgotPasswordForm() {
                 </FormItem>
               )}
             />
-            <Button type="submit" className="mt-2 h-10 w-full" disabled={forgotPassword.isPending}>
+            <TurnstileWidget
+              onVerify={(token) => form.setValue("turnstileToken", token)}
+              onExpire={() => form.setValue("turnstileToken", "")}
+            />
+            <Button
+              type="submit"
+              className="mt-2 h-10 w-full"
+              disabled={forgotPassword.isPending || (needsCaptcha && !turnstileToken)}
+            >
               {forgotPassword.isPending && <Loader2 className="size-4 animate-spin" />}
               Send reset link
             </Button>

@@ -25,6 +25,8 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { cn } from "@/lib/utils";
+import { TurnstileWidget } from "@/components/turnstile-widget";
+import { env } from "@/lib/env";
 import { ROUTES } from "@/constants/routes";
 import { useRegister } from "../hooks";
 import { registerSchema, type RegisterInput } from "../schemas";
@@ -58,8 +60,11 @@ export function RegisterForm() {
       firstName: "",
       lastName: "",
       role: requestedRole === "PROFESSIONAL" ? "PROFESSIONAL" : "CLIENT",
+      turnstileToken: "",
     },
   });
+  const turnstileToken = form.watch("turnstileToken");
+  const needsCaptcha = Boolean(env.NEXT_PUBLIC_TURNSTILE_SITE_KEY);
 
   function onSubmit(values: RegisterInput) {
     register.mutate(values, {
@@ -174,7 +179,15 @@ export function RegisterForm() {
                 </FormItem>
               )}
             />
-            <Button type="submit" className="mt-2 h-10 w-full" disabled={register.isPending}>
+            <TurnstileWidget
+              onVerify={(token) => form.setValue("turnstileToken", token)}
+              onExpire={() => form.setValue("turnstileToken", "")}
+            />
+            <Button
+              type="submit"
+              className="mt-2 h-10 w-full"
+              disabled={register.isPending || (needsCaptcha && !turnstileToken)}
+            >
               {register.isPending && <Loader2 className="size-4 animate-spin" />}
               Create account
             </Button>

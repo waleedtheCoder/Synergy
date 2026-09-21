@@ -18,6 +18,7 @@ import type { Request, Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import * as QRCode from 'qrcode';
 import { AuthService } from './auth.service';
+import { TurnstileService } from './turnstile.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
@@ -41,6 +42,7 @@ import type { TokenPair } from './types/token-pair.type';
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
+    private readonly turnstileService: TurnstileService,
     private readonly config: ConfigService,
   ) {}
 
@@ -80,6 +82,7 @@ export class AuthController {
     @Req() req: Request,
     @Res() res: Response,
   ) {
+    await this.turnstileService.verify(dto.turnstileToken, req.ip);
     const result = await this.authService.register(dto, this.requestMeta(req));
     return this.respondWithTokens(res, result);
   }
@@ -94,6 +97,7 @@ export class AuthController {
     @Req() req: Request,
     @Res() res: Response,
   ) {
+    await this.turnstileService.verify(dto.turnstileToken, req.ip);
     const user = await this.authService.validateLocalUser(
       dto.email,
       dto.password,
@@ -152,7 +156,8 @@ export class AuthController {
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Request a password reset email' })
-  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+  async forgotPassword(@Body() dto: ForgotPasswordDto, @Req() req: Request) {
+    await this.turnstileService.verify(dto.turnstileToken, req.ip);
     await this.authService.forgotPassword(dto.email);
     return { success: true, data: null };
   }

@@ -22,6 +22,8 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { TurnstileWidget } from "@/components/turnstile-widget";
+import { env } from "@/lib/env";
 import { ROUTES } from "@/constants/routes";
 import { useLogin } from "../hooks";
 import { loginSchema, type LoginInput } from "../schemas";
@@ -32,8 +34,10 @@ export function LoginForm() {
   const login = useLogin();
   const form = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: "", password: "" },
+    defaultValues: { email: "", password: "", turnstileToken: "" },
   });
+  const turnstileToken = form.watch("turnstileToken");
+  const needsCaptcha = Boolean(env.NEXT_PUBLIC_TURNSTILE_SITE_KEY);
 
   function onSubmit(values: LoginInput) {
     login.mutate(values, {
@@ -84,7 +88,15 @@ export function LoginForm() {
                 </FormItem>
               )}
             />
-            <Button type="submit" className="mt-2 h-10 w-full" disabled={login.isPending}>
+            <TurnstileWidget
+              onVerify={(token) => form.setValue("turnstileToken", token)}
+              onExpire={() => form.setValue("turnstileToken", "")}
+            />
+            <Button
+              type="submit"
+              className="mt-2 h-10 w-full"
+              disabled={login.isPending || (needsCaptcha && !turnstileToken)}
+            >
               {login.isPending && <Loader2 className="size-4 animate-spin" />}
               Log in
             </Button>

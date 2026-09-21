@@ -17,17 +17,20 @@ export const registerSchema = z.object({
   role: z.enum(["CLIENT", "PROFESSIONAL"], {
     message: "Choose how you plan to use Synergi",
   }),
+  turnstileToken: z.string().optional(),
 });
 export type RegisterInput = z.infer<typeof registerSchema>;
 
 export const loginSchema = z.object({
   email: z.string().email("Enter a valid email address"),
   password: z.string().min(1, "Password is required"),
+  turnstileToken: z.string().optional(),
 });
 export type LoginInput = z.infer<typeof loginSchema>;
 
 export const forgotPasswordSchema = z.object({
   email: z.string().email("Enter a valid email address"),
+  turnstileToken: z.string().optional(),
 });
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 

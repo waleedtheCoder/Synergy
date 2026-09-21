@@ -169,12 +169,22 @@ source, not re-assumed.)
        Note: the gateway's rate limiter is in-memory/per-process — correct for a
        single API instance, would need a shared store (Redis) if this ever runs
        behind a load balancer with multiple instances.
-[MISSING] No CAPTCHA/proof-of-work on registration, login, or forgot-password.
-       Deliberately not added — every option (hCaptcha, reCAPTCHA, Turnstile)
-       needs a third-party account and API key that wasn't set up, and per this
-       project's own pattern of preferring self-hosted/manual alternatives over
-       handing over unrequested third-party credentials, this needs your explicit
-       go-ahead on which provider before it's wired in.
+[DONE] Cloudflare Turnstile wired into register/login/forgot-password, both
+       sides:
+       - API: TurnstileService (auth/turnstile.service.ts) posts the token to
+         Cloudflare's siteverify endpoint; TURNSTILE_SECRET_KEY unset disables
+         verification entirely (dev/CI convenience, matches how RESEND_API_KEY
+         degrades). Wired into all three controller endpoints via
+         dto.turnstileToken.
+       - Web: components/turnstile-widget.tsx loads Cloudflare's script and
+         renders the widget (renders nothing if
+         NEXT_PUBLIC_TURNSTILE_SITE_KEY is unset); submit buttons disabled
+         until a token is present when the widget is active.
+       - Verified for real, not just "the build didn't error": registered a
+         live test account through the actual browser against the actual
+         Cloudflare widget (Managed mode, passed silently) and confirmed the
+         account was created and logged in — proves the full chain (widget →
+         token → form → API → Cloudflare siteverify → registration) works.
 
 
 8. SECRETS & CREDENTIALS MANAGEMENT
@@ -417,21 +427,21 @@ PRIORITY IF STARTING FROM HERE
 =================================
 Everything in the original 5-item list (per-route auth rate limits, admin audit
 log, explicit CSP, pnpm audit/Dependabot, and a start on automated auth tests) is
-now DONE — see sections 2, 5, 7, 12, 15, 20. What's left, in rough order of
+now DONE — see sections 2, 5, 7, 12, 15, 20. CAPTCHA (Cloudflare Turnstile) is
+also now DONE and verified live — see section 7. What's left, in rough order of
 impact vs effort:
   1. Expand security.e2e-spec.ts's IDOR coverage beyond project-requests to every
      resource controller with an ownership check (section 2/20) — the pattern is
      proven, it's now a matter of repeating it.
   2. Fix the Google-OAuth-login + 2FA-enabled interaction, which currently fails
      closed with a confusing 401 instead of prompting for the code (section 1).
-  3. Decide on a CAPTCHA provider for register/login/forgot-password (section 7)
-     — needs your call on which third-party service and its API key.
-  4. TLS/HSTS termination + real production NODE_ENV wherever this deploys
+  3. TLS/HSTS termination + real production NODE_ENV wherever this deploys
      (sections 4 & 18) — the app-side header logic is ready, it just needs real
      HTTPS in front of it.
-  5. A written incident-response runbook (section 14) — deliberately not drafted
+  4. A written incident-response runbook (section 14) — deliberately not drafted
      here since it needs org-specific details (who's on call, who has authority
      to rotate secrets/revoke sessions in a real incident) that only you can fill
      in; happy to draft a starting skeleton if useful.
-  6. Legal review of the privacy/terms pages before any real users see them
-     (section 19) — still template content with placeholder contact emails.
+  5. Legal review of the privacy/terms pages before any real users see them
+     (section 19) — still template content, and no registered company exists
+     yet to fill in the real business details, so this was skipped this pass.
