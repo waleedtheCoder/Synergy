@@ -347,13 +347,16 @@ source, not re-assumed.)
        no password at all, i.e. Google-only sign-in, since there's nothing to
        check; the OTP code itself is still required regardless). Covered by
        apps/api/test/google-2fa.e2e-spec.ts.
-[MISSING] 2FA has no frontend UI at all — every 2FA endpoint (setup, confirm,
-       disable) is backend-only, reachable only via direct API calls (Swagger,
-       curl, etc.), not through the actual web app. No real user can currently
-       turn 2FA on for their own account. Worth flagging clearly: the ADMIN-
-       required-2FA enforcement above means a fresh admin account is
-       technically locked out of admin routes until *someone* calls these
-       endpoints directly on their behalf, since there's no settings page yet.
+[DONE] 2FA settings UI (components/features/auth/components/two-factor-
+       settings.tsx) — QR code + manual-entry secret display, code+password
+       confirmation, one-time recovery-codes display, and a disable flow
+       (password+code), mounted on all three settings surfaces: client
+       dashboard, pro dashboard, and a new /admin/settings page (added
+       specifically since ADMIN accounts require 2FA to use admin routes —
+       this closes that lockout gap). Verified live end-to-end in the browser:
+       enabled 2FA with a real generated TOTP code, saw the actual recovery
+       codes, then disabled it again — both round trips confirmed against the
+       real API, not just "the build didn't error."
 [MISSING] No IP allow-listing option for admin routes. Infra-level control
        (reverse proxy or WAF rule), not something to build in application code.
 
@@ -448,18 +451,15 @@ PRIORITY IF STARTING FROM HERE
 Everything in the original 5-item list (per-route auth rate limits, admin audit
 log, explicit CSP, pnpm audit/Dependabot, and a start on automated auth tests) is
 now DONE — see sections 2, 5, 7, 12, 15, 20. CAPTCHA (Cloudflare Turnstile),
-the Google OAuth + 2FA login bug, the 2FA step-up-auth asymmetry, and the
-incident-response runbook are also now DONE — see sections 1, 7, 14, 15.
-What's left, in rough order of impact vs effort:
-  1. A 2FA settings UI — the feature is fully built and enforced server-side
-     (including on ADMIN accounts) but has zero frontend, so no real user can
-     currently turn it on. Building this next.
-  2. Expand security.e2e-spec.ts's IDOR coverage beyond project-requests to every
+the Google OAuth + 2FA login bug, the 2FA step-up-auth asymmetry, the
+incident-response runbook, and the 2FA settings UI are also now DONE — see
+sections 1, 7, 14, 15. What's left, in rough order of impact vs effort:
+  1. Expand security.e2e-spec.ts's IDOR coverage beyond project-requests to every
      resource controller with an ownership check (section 2/20) — the pattern is
      proven, it's now a matter of repeating it.
-  3. TLS/HSTS termination + real production NODE_ENV wherever this deploys
+  2. TLS/HSTS termination + real production NODE_ENV wherever this deploys
      (sections 4 & 18) — the app-side header logic is ready, it just needs real
      HTTPS in front of it.
-  4. Legal review of the privacy/terms pages before any real users see them
+  3. Legal review of the privacy/terms pages before any real users see them
      (section 19) — still template content, and no registered company exists
      yet to fill in the real business details, so this was skipped this pass.

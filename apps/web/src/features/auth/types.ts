@@ -7,4 +7,5 @@ export interface AuthUser {
   firstName: string;
   lastName: string;
   emailVerified: boolean;
+  twoFactorEnabled: boolean;
 }

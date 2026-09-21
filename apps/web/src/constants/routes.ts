@@ -36,6 +36,7 @@ export const ROUTES = {
   adminCampaigns: "/admin/campaigns",
   adminPayments: "/admin/payments",
   adminAnalytics: "/admin/analytics",
+  adminSettings: "/admin/settings",
   advertiser: "/advertiser",
   privacy: "/privacy",
   terms: "/terms",

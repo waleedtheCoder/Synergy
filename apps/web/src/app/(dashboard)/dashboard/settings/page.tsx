@@ -20,10 +20,13 @@ import { PageHeader } from "@/features/dashboard/components/page-header";
 import { useProfile, useUpdateProfile } from "@/features/dashboard/hooks";
 import { updateProfileSchema, type UpdateProfileInput } from "@/features/dashboard/schemas";
 import { FileUpload } from "@/features/uploads/components/file-upload";
+import { TwoFactorSettings } from "@/features/auth/components/two-factor-settings";
+import { useAuthStore } from "@/features/auth/store/auth-store";
 
 export default function SettingsPage() {
   const { data: profile, isLoading } = useProfile();
   const updateProfile = useUpdateProfile();
+  const authUser = useAuthStore((state) => state.user);
 
   const form = useForm<UpdateProfileInput>({
     resolver: zodResolver(updateProfileSchema),
@@ -146,6 +149,12 @@ export default function SettingsPage() {
           </Form>
         </CardContent>
       </Card>
+
+      {authUser && (
+        <div className="mt-6">
+          <TwoFactorSettings user={authUser} />
+        </div>
+      )}
     </div>
   );
 }

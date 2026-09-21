@@ -14,6 +14,7 @@ import {
   Loader2,
   Megaphone,
   Menu,
+  Settings,
   Tags,
   Users,
   X,
@@ -34,6 +35,7 @@ const NAV_ITEMS = [
   { href: ROUTES.adminCampaigns, label: "Campaigns", icon: Megaphone },
   { href: ROUTES.adminPayments, label: "Payments", icon: CreditCard },
   { href: ROUTES.adminAnalytics, label: "Analytics", icon: BarChart3 },
+  { href: ROUTES.adminSettings, label: "Settings", icon: Settings },
 ];
 
 function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {

@@ -64,3 +64,27 @@ export async function forgotPasswordRequest(input: ForgotPasswordInput) {
 export async function resetPasswordRequest(input: ResetPasswordInput) {
   await apiClient.post<ApiEnvelope<null>>("/auth/reset-password", input);
 }
+
+export async function setupTwoFactorRequest() {
+  const { data } = await apiClient.post<
+    ApiEnvelope<{ otpauthUrl: string; qrCodeDataUrl: string }>
+  >("/auth/2fa/setup");
+  return data.data;
+}
+
+export async function confirmTwoFactorRequest(input: {
+  code: string;
+  password?: string;
+}) {
+  const { data } = await apiClient.post<
+    ApiEnvelope<{ recoveryCodes: string[] }>
+  >("/auth/2fa/confirm", input);
+  return data.data;
+}
+
+export async function disableTwoFactorRequest(input: {
+  password: string;
+  code: string;
+}) {
+  await apiClient.post<ApiEnvelope<null>>("/auth/2fa/disable", input);
+}

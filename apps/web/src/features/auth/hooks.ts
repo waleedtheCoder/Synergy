@@ -1,15 +1,18 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AxiosError } from "axios";
 import { toast } from "sonner";
 import { useAuthStore } from "./store/auth-store";
 import {
   completeGoogleTwoFactorRequest,
+  confirmTwoFactorRequest,
+  disableTwoFactorRequest,
   fetchCurrentUser,
   forgotPasswordRequest,
   loginRequest,
   logoutRequest,
   registerRequest,
   resetPasswordRequest,
+  setupTwoFactorRequest,
   verifyEmailRequest,
 } from "./api";
 
@@ -83,6 +86,43 @@ export function useCompleteGoogleTwoFactor() {
     },
     onError: (error) => {
       toast.error(errorMessage(error, "Invalid or expired code"));
+    },
+  });
+}
+
+export function useSetupTwoFactor() {
+  return useMutation({
+    mutationFn: setupTwoFactorRequest,
+    onError: (error) => {
+      toast.error(errorMessage(error, "Could not start two-factor setup"));
+    },
+  });
+}
+
+export function useConfirmTwoFactor() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: confirmTwoFactorRequest,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
+    },
+    onError: (error) => {
+      toast.error(errorMessage(error, "Could not confirm two-factor authentication"));
+    },
+  });
+}
+
+export function useDisableTwoFactor() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: disableTwoFactorRequest,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
+    },
+    onError: (error) => {
+      toast.error(errorMessage(error, "Could not disable two-factor authentication"));
     },
   });
 }
