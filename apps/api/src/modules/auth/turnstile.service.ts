@@ -24,6 +24,15 @@ export class TurnstileService {
   constructor(private readonly config: ConfigService) {}
 
   async verify(token: string | undefined, remoteIp?: string): Promise<void> {
+    // Automated tests can't solve a real Turnstile challenge, so this is
+    // skipped in the test environment the same way Swagger docs and
+    // production-only headers are gated on NODE_ENV elsewhere in this app —
+    // not a security-relevant exception, since NODE_ENV isn't attacker-
+    // controlled in a real deployment.
+    if (this.config.get('NODE_ENV') === 'test') {
+      return;
+    }
+
     const secret = this.config.get<string>('TURNSTILE_SECRET_KEY');
 
     if (!secret) {

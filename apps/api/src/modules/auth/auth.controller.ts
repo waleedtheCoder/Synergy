@@ -26,6 +26,7 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { Confirm2faDto } from './dto/confirm-2fa.dto';
 import { Disable2faDto } from './dto/disable-2fa.dto';
+import { CompleteGoogle2faDto } from './dto/complete-google-2fa.dto';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
@@ -268,13 +269,38 @@ export class AuthController {
   async googleCallback(@Req() req: Request, @Res() res: Response) {
     const profile = req.user as GoogleProfilePayload;
     const user = await this.authService.validateGoogleUser(profile);
-    const result = await this.authService.login(user, this.requestMeta(req));
-
-    this.setRefreshCookie(res, result.refreshToken);
-
     const webUrl = this.config.getOrThrow<string>('WEB_URL');
     const redirectUrl = new URL('/auth/callback', webUrl);
+
+    if (user.twoFactorEnabled) {
+      const pendingToken = this.authService.signPendingTwoFactorToken(user.id);
+      redirectUrl.searchParams.set('pending2fa', pendingToken);
+      return res.redirect(redirectUrl.toString());
+    }
+
+    const result = await this.authService.login(user, this.requestMeta(req));
+    this.setRefreshCookie(res, result.refreshToken);
     redirectUrl.searchParams.set('accessToken', result.accessToken);
     return res.redirect(redirectUrl.toString());
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Post('google/complete-2fa')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Finish a Google sign-in for a 2FA-enabled account',
+  })
+  async completeGoogleTwoFactor(
+    @Body() dto: CompleteGoogle2faDto,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    const result = await this.authService.completeGoogleTwoFactor(
+      dto.pendingToken,
+      dto.otpCode,
+      this.requestMeta(req),
+    );
+    return this.respondWithTokens(res, result);
   }
 }

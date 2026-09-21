@@ -214,6 +214,59 @@ export class AuthService {
     return { user, ...tokens };
   }
 
+  // Google OAuth is a full-page redirect, so a 2FA-enabled account can't be
+  // prompted for its code inline the way password login can — the callback
+  // can't just call login() with no otpCode, since that fails closed (401)
+  // and locks these users out entirely. Instead it hands back a short-lived,
+  // single-purpose token the web app exchanges for real tokens once the user
+  // enters their code, via completeGoogleTwoFactor() below.
+  //
+  // Signed with ENCRYPTION_KEY, not JWT_ACCESS_SECRET — critically, this
+  // means JwtStrategy (which only trusts JWT_ACCESS_SECRET) can never accept
+  // this token as a bearer credential, so it can't be used to skip 2FA even
+  // if it leaked.
+  signPendingTwoFactorToken(userId: string): string {
+    return this.jwt.sign(
+      { sub: userId, purpose: 'pending-2fa' },
+      { secret: this.getEncryptionKey(), expiresIn: '5m' },
+    );
+  }
+
+  async completeGoogleTwoFactor(
+    pendingToken: string,
+    otpCode: string,
+    meta: RequestMeta,
+  ): Promise<{ user: AuthenticatedUser } & TokenPair> {
+    let payload: { sub: string; purpose: string };
+    try {
+      payload = await this.jwt.verifyAsync(pendingToken, {
+        secret: this.getEncryptionKey(),
+      });
+    } catch {
+      throw new UnauthorizedException(
+        'This sign-in has expired — please try again',
+      );
+    }
+
+    if (payload.purpose !== 'pending-2fa') {
+      throw new UnauthorizedException('Invalid sign-in token');
+    }
+
+    const record = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+    });
+    if (
+      !record ||
+      record.deletedAt ||
+      record.status === UserStatus.SUSPENDED ||
+      record.status === UserStatus.DEACTIVATED
+    ) {
+      throw new UnauthorizedException('Account is not accessible');
+    }
+
+    return this.login(this.toAuthenticatedUser(record), meta, otpCode);
+  }
+
   // ── Two-factor authentication (TOTP) ────────────────────────────────
 
   private getEncryptionKey(): string {

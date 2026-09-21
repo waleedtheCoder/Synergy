@@ -33,6 +33,17 @@ export async function loginRequest(input: LoginInput) {
   return data.data;
 }
 
+export async function completeGoogleTwoFactorRequest(input: {
+  pendingToken: string;
+  otpCode: string;
+}) {
+  const { data } = await apiClient.post<ApiEnvelope<SessionResponse>>(
+    "/auth/google/complete-2fa",
+    input,
+  );
+  return data.data;
+}
+
 export async function logoutRequest() {
   await apiClient.post<ApiEnvelope<null>>("/auth/logout");
 }

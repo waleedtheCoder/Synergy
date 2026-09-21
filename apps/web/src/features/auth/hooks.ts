@@ -3,6 +3,7 @@ import { AxiosError } from "axios";
 import { toast } from "sonner";
 import { useAuthStore } from "./store/auth-store";
 import {
+  completeGoogleTwoFactorRequest,
   fetchCurrentUser,
   forgotPasswordRequest,
   loginRequest,
@@ -68,6 +69,20 @@ export function useLogin() {
     },
     onError: (error) => {
       toast.error(errorMessage(error, "Invalid email or password"));
+    },
+  });
+}
+
+export function useCompleteGoogleTwoFactor() {
+  const setSession = useAuthStore((state) => state.setSession);
+
+  return useMutation({
+    mutationFn: completeGoogleTwoFactorRequest,
+    onSuccess: (session) => {
+      setSession(session);
+    },
+    onError: (error) => {
+      toast.error(errorMessage(error, "Invalid or expired code"));
     },
   });
 }
