@@ -241,9 +241,13 @@ source, not re-assumed.)
 [DONE] Size limit (8MB) and allow-listed MIME types enforced server-side.
 [DONE] Random UUID filenames — no user-controlled filenames reach storage, which
        prevents path traversal and filename-collision attacks.
-[MISSING] No malware/virus scanning on uploaded files. Would need a third-party
-       scanner (ClamAV self-hosted, or a VirusTotal-style API) — a real gap, but
-       needs a hosting/infra decision, not something to silently wire up.
+[ACCEPTED RISK] No malware/virus scanning on uploaded files. Explicitly decided
+       against for now (would need ClamAV self-hosted or a VirusTotal-style API
+       — real setup work, more than a code change): uploads go straight to
+       Supabase Storage and are never executed by the app server, so the
+       actual risk today is low. Revisit if this becomes higher-traffic —
+       served files being viewed by other users is the scenario that would
+       change this calculus.
 [DONE] Uploaded images are re-encoded through sharp before storage
        (uploads.service.ts stripImageMetadata) — this drops EXIF/IPTC/XMP
        metadata, including GPS location, by default. GIFs are passed through
@@ -316,9 +320,13 @@ source, not re-assumed.)
        logins, password resets, role changes, or admin actions.
 [MISSING] No alerting/paging on suspicious patterns (e.g. a spike in failed
        logins, a burst of 403s from one IP, unusual admin activity).
-[MISSING] No documented incident response plan — no runbook for "what do we do if
-       credentials leak / the DB is compromised / we get a report of an account
-       takeover."
+[DONE] security-incident-response.md — concrete runbooks for credential leak,
+       DB compromise, account takeover, admin account compromise, and
+       dependency vulnerabilities, using this app's actual tools (Sentry,
+       AdminAuditLog, Supabase dashboard, session revocation) rather than
+       generic advice. Solo project — Waleed
+       (waleedbinaamer2003@gmail.com) is the sole contact and credential
+       holder; update that section first if the team ever grows.
 
 
 15. ADMIN PANEL & PRIVILEGED OPERATIONS
@@ -439,19 +447,19 @@ PRIORITY IF STARTING FROM HERE
 =================================
 Everything in the original 5-item list (per-route auth rate limits, admin audit
 log, explicit CSP, pnpm audit/Dependabot, and a start on automated auth tests) is
-now DONE — see sections 2, 5, 7, 12, 15, 20. CAPTCHA (Cloudflare Turnstile) is
-also now DONE and verified live — see section 7. What's left, in rough order of
-impact vs effort:
-  1. Expand security.e2e-spec.ts's IDOR coverage beyond project-requests to every
+now DONE — see sections 2, 5, 7, 12, 15, 20. CAPTCHA (Cloudflare Turnstile),
+the Google OAuth + 2FA login bug, the 2FA step-up-auth asymmetry, and the
+incident-response runbook are also now DONE — see sections 1, 7, 14, 15.
+What's left, in rough order of impact vs effort:
+  1. A 2FA settings UI — the feature is fully built and enforced server-side
+     (including on ADMIN accounts) but has zero frontend, so no real user can
+     currently turn it on. Building this next.
+  2. Expand security.e2e-spec.ts's IDOR coverage beyond project-requests to every
      resource controller with an ownership check (section 2/20) — the pattern is
      proven, it's now a matter of repeating it.
-  2. TLS/HSTS termination + real production NODE_ENV wherever this deploys
+  3. TLS/HSTS termination + real production NODE_ENV wherever this deploys
      (sections 4 & 18) — the app-side header logic is ready, it just needs real
      HTTPS in front of it.
-  3. A written incident-response runbook (section 14) — deliberately not drafted
-     here since it needs org-specific details (who's on call, who has authority
-     to rotate secrets/revoke sessions in a real incident) that only you can fill
-     in; happy to draft a starting skeleton if useful.
   4. Legal review of the privacy/terms pages before any real users see them
      (section 19) — still template content, and no registered company exists
      yet to fill in the real business details, so this was skipped this pass.
