@@ -1,0 +1,437 @@
+SYNERGI — SECURITY CHECKLIST
+=============================
+A working audit of security precautions for a marketplace app like this one:
+what Synergi already does, what's partial, and what's still missing. Not the
+RFC 9116 "security.txt" vulnerability-disclosure file — just named that per
+request. Status tags:
+  [DONE]    verified in the current codebase
+  [PARTIAL] something exists but isn't complete/hardened
+  [MISSING] not implemented yet — do this before real users depend on it
+
+Last reviewed: 2026-09-21 (updated same day — most of the original [MISSING]
+items below were actually the TODO list this checklist was written against;
+they were implemented in the same session, in the uncommitted diff, before
+this file was reconciled with the real code. Re-verified against the actual
+source, not re-assumed.)
+
+
+1. AUTHENTICATION
+------------------
+[DONE] Passwords hashed with bcrypt, cost factor 12 (apps/api/src/modules/auth/auth.service.ts).
+[DONE] Password policy: min 8 chars, requires upper+lower+digit (register.dto.ts).
+[DONE] Access tokens are short-lived JWTs (15m) returned in the response body only —
+       never written to localStorage, held in memory (Zustand) on the client.
+[DONE] Refresh tokens (30d) are httpOnly + secure + sameSite=lax cookies, scoped to
+       /api/v1/auth, AND their SHA-256 hash is stored server-side (RefreshToken table)
+       so they can be revoked. Rotation-on-use: every refresh call revokes the old
+       record and issues a new one — this is what makes logout/revocation real
+       instead of just deleting a cookie.
+[DONE] Google OAuth is a real second login path (not just email/password) with its
+       own email-verified trust (emailVerified: true on Google-linked accounts).
+[DONE] Account lockout: failedLoginAttempts/lockedUntil on the User model
+       (auth.service.ts validateLocalUser) — wrong password increments a counter,
+       hitting the threshold locks the account for a fixed window regardless of
+       the global per-IP rate limit. Reset on successful login.
+[DONE] 2FA/TOTP (otplib) with SHA-256-hashed recovery codes; secret stored
+       encrypted at rest (AES-256-GCM, crypto.util.ts). ADMIN accounts are now
+       required to have 2FA enabled before accessing any admin-only resource
+       (enforced in common/guards/roles.guard.ts, added this pass — see section 15).
+       Known gap: Google-OAuth login for an account with 2FA already enabled
+       currently fails closed (401) instead of prompting for the code — a
+       functional bug to fix, not a security hole (found during this session's
+       code review).
+[DONE] Session list + per-session revocation (auth.service.ts listSessions/
+       revokeSession/revokeAllOtherSessions) — ownership-checked, no IDOR.
+[DONE] Email alerts exist for new-login and password-changed events
+       (mail/templates/auth-email.templates.ts).
+[PARTIAL] JWT secrets (JWT_ACCESS_SECRET, JWT_REFRESH_SECRET) are plain strings in
+       .env with no rotation mechanism. If one leaks, every issued token is
+       compromised until secrets are rotated and all refresh tokens revoked by hand.
+       This is an operational/deployment concern, not something fixable in code.
+
+
+2. AUTHORIZATION / ACCESS CONTROL
+----------------------------------
+[DONE] Every route requires auth by default (global JwtAuthGuard); routes must be
+       explicitly marked @Public() to skip it — fail-closed by design, not fail-open.
+[DONE] Role-based access control via @Roles()/RolesGuard for admin-only and
+       professional-only endpoints.
+[DONE] Object-level ownership checks exist and are used consistently — e.g.
+       project-requests.service.ts's getOwned() scopes every read/update by the
+       requesting user's own client/professional profile ID, not just their auth
+       status. This is the pattern that prevents IDOR (someone else's request ID
+       guessed/incremented in the URL). Worth auditing that EVERY new resource
+       controller follows this same pattern before it ships — it's a discipline,
+       not something the framework enforces automatically.
+[PARTIAL] apps/api/test/security.e2e-spec.ts now exists — a real regression suite
+       proving the auth guard, role guard, IDOR blocking, and login rate limiting
+       hold at the HTTP boundary. Currently only covers project-requests as the
+       IDOR example, not every resource controller — expanding it to cover every
+       new controller as it's built is the discipline that keeps this honest.
+[DONE] Admin action audit log (AdminAuditLogService + AdminAuditLogController, new
+       this pass) — every admin service (campaigns, categories, disputes,
+       payments, reports, skills, users, verification) now calls
+       auditLog.log({adminId, action, targetType, targetId, metadata, ipAddress})
+       on its mutating actions. Queryable by admin/ID/target via GET on the new
+       controller, itself admin-role-gated. Logging failures are swallowed (logged,
+       not thrown) so a logging bug can never block the actual admin action.
+
+
+3. INPUT VALIDATION & INJECTION
+---------------------------------
+[DONE] Global ValidationPipe with whitelist:true + forbidNonWhitelisted:true — any
+       unexpected field in a request body is rejected outright, not silently
+       dropped or accepted. This also blocks classic mass-assignment attacks
+       (e.g. a client trying to slip `role: "ADMIN"` into a registration payload).
+[DONE] All DB access goes through Prisma's query builder (parameterized queries) —
+       no raw SQL string concatenation anywhere in the codebase, so no SQL
+       injection surface from application code.
+[DONE] class-validator decorators on every DTO enforce types/shapes/formats server-
+       side, not just client-side.
+[DONE] Server-side HTML sanitization added this pass (sanitize-html, allowedTags:
+       [] — full strip, not an allow-list, since these are plain-text fields with
+       no legitimate markup to preserve): chat message content, feed comment
+       content, professional bio/tagline/businessName, portfolio project
+       title/description/location. Applied via a shared @StripHtml() class-
+       transformer decorator (common/decorators/strip-html.decorator.ts) so it
+       runs before class-validator's checks. Genuine defense-in-depth, not a fix
+       for an active hole — React already escapes these on render.
+[DONE] File upload validation inspects actual file content, not declared MIME
+       type/extension (common/utils/file-signature.util.ts, magic-byte detection
+       for JPEG/PNG/WEBP/GIF/PDF; uploads.service.ts rejects anything whose bytes
+       don't match one of those). Storage filename is a random UUID with the
+       extension derived from the detected type, not the client's claim — closes
+       both the renamed-malicious-file and path-traversal angles. Uploaded images
+       are also re-encoded through sharp before storage, which strips EXIF/GPS
+       metadata as a side effect (see section 10).
+
+
+4. TRANSPORT & NETWORK SECURITY
+----------------------------------
+[MISSING] Everything currently runs over plain HTTP on localhost — there is no
+       TLS/HTTPS termination configured anywhere in this repo (expected at this
+       stage; explicitly excluded from earlier work in this project as "deployment"
+       territory). Whatever this gets deployed behind MUST terminate TLS 1.2+ before
+       traffic reaches the app, and HSTS should be enabled once it does.
+[DONE] HSTS header is now set (main.ts, 1yr max-age + includeSubDomains + preload)
+       but ONLY when NODE_ENV=production, since enabling it without real HTTPS in
+       front of the app would break the site for return visitors. Still contingent
+       on whatever this deploys behind actually terminating TLS — the header alone
+       does nothing if there's no HTTPS to enforce.
+
+
+5. HTTP SECURITY HEADERS
+---------------------------
+[DONE] helmet() is applied globally in main.ts, giving baseline protection:
+       X-Content-Type-Options: nosniff, X-Frame-Options, X-DNS-Prefetch-Control,
+       and a default Content-Security-Policy.
+[DONE] CSP is explicitly allow-listed for production (main.ts), not left at
+       helmet's default: self + the actual Supabase Storage origin + Sentry's
+       ingest origin for img/connect-src, script/style-src locked to 'self',
+       objectSrc/frameAncestors 'none'. Left permissive (false) in non-production
+       since dev-only Swagger UI needs inline scripts the tight policy would break
+       — and the docs route is never mounted in production anyway, so there's no
+       real tradeoff. HSTS is also now set (1 year, includeSubDomains, preload) in
+       production only — deliberately not force-enabled without HTTPS in place.
+[DONE] Permissions-Policy explicitly denies camera/microphone/geolocation/payment/
+       usb — this app uses none of them.
+[DONE] Referrer-Policy explicitly set to strict-origin-when-cross-origin (was
+       already helmet's default, now a deliberate choice rather than incidental).
+
+
+6. CORS
+--------
+[DONE] CORS is NOT wide open — origin is locked to the single configured WEB_URL,
+       with credentials:true (required for the httpOnly refresh cookie to work
+       cross-origin). This is correct and meaningfully better than the common
+       mistake of `origin: '*'` with credentials enabled (which browsers actually
+       forbid, but people still try).
+[MISSING] Only one origin is currently configurable (single WEB_URL string) — fine
+       for now, but if this ever needs to serve multiple frontends (marketing site,
+       staging, a mobile app's web view) the CORS config will need to become an
+       allow-list rather than a single string.
+
+
+7. RATE LIMITING & ABUSE PREVENTION
+--------------------------------------
+[DONE] Global ThrottlerGuard: 100 requests per 60s window per client by default
+       (THROTTLE_TTL/THROTTLE_LIMIT env vars).
+[DONE] Auth endpoints have stricter per-route limits, not just the flat global one
+       (auth.controller.ts): register 10/hour, login 5/min, forgot-password 3/min.
+[DONE] Messaging/quotation abuse limits added this pass:
+       - Chat messages go over Socket.io (chats.gateway.ts message:send), which
+         sits entirely outside the HTTP ThrottlerGuard — added a dedicated
+         per-user in-memory sliding-window limiter (20 messages / 10s) directly in
+         the gateway, since the HTTP guard can't reach it.
+       - Quotation POST: 20/min (per-professional, on top of the global limit).
+       - Certificate submission POST: 5/hour (targets the specific "resubmit to
+         spam the admin review queue" abuse case from section 17).
+       Note: the gateway's rate limiter is in-memory/per-process — correct for a
+       single API instance, would need a shared store (Redis) if this ever runs
+       behind a load balancer with multiple instances.
+[MISSING] No CAPTCHA/proof-of-work on registration, login, or forgot-password.
+       Deliberately not added — every option (hCaptcha, reCAPTCHA, Turnstile)
+       needs a third-party account and API key that wasn't set up, and per this
+       project's own pattern of preferring self-hosted/manual alternatives over
+       handing over unrequested third-party credentials, this needs your explicit
+       go-ahead on which provider before it's wired in.
+
+
+8. SECRETS & CREDENTIALS MANAGEMENT
+--------------------------------------
+[DONE] Every real credential (DB URL, Supabase service-role key, Resend API key,
+       Google OAuth client secret, Sentry DSN, JWT signing secrets) lives in
+       .env files that are gitignored — none are committed to the repository.
+       .env.example files document required shape without real values.
+[MISSING] No secrets manager (Vault, AWS Secrets Manager, Doppler, etc.) — plain
+       .env files are fine for local dev but are not how production secrets
+       should be held. Whatever hosts this in production needs its own secret-
+       injection mechanism (platform env vars at minimum), and secrets should
+       never be baked into a Docker image or committed as deployment config.
+[MISSING] No secret rotation policy or schedule for any credential.
+[DONE] Git-history secret scan run this pass (full `git log -p --all`, no gitleaks/
+       truffleHog installed so done via targeted pattern search): no AWS keys,
+       Stripe/GitHub/Google API key formats, JWTs, or committed .env files
+       anywhere in history, on any branch. Not a substitute for a proper gitleaks
+       run if this ever matters more (e.g. before open-sourcing), but rules out
+       the obvious cases.
+
+
+9. DATABASE SECURITY
+-----------------------
+[DONE] Database is Supabase-hosted Postgres, not self-managed — inherits Supabase's
+       own infrastructure hardening, automated patching, and network isolation.
+[DONE] The app connects via a single service-role-equivalent connection string
+       (through Prisma's pg adapter) — this is appropriate for a backend-only
+       app that never runs untrusted client-supplied queries.
+[DONE] Supabase's auto-generated public Data API (PostgREST) was deliberately
+       disabled at project creation specifically because this app never uses it —
+       leaving it on would have exposed every table over an unauthenticated REST
+       endpoint with no RLS configured.
+[MISSING] Row-Level Security (RLS) is NOT enabled on any table. This is fine
+       *because* the Data API is off and Prisma is the only access path with a
+       trusted server-side key — but it means the database itself provides zero
+       defense-in-depth if the connection string ever leaks. If the Data API is
+       ever turned back on for any reason, RLS must be turned on first.
+[MISSING] No automated backup-restore drill has been performed — Supabase's free
+       tier has limited backup retention, and nobody has verified data can
+       actually be restored from a backup if needed.
+[MISSING] No least-privilege DB role separation (e.g. a read-only role for
+       analytics/reporting, a narrower role for less-trusted background jobs) —
+       everything currently runs as the one full-access connection.
+
+
+10. FILE UPLOAD SECURITY
+---------------------------
+[DONE] Uploads go to Supabase Storage, not local disk — files are served from a
+       separate origin/CDN, not directly executed by the app server.
+[DONE] Size limit (8MB) and allow-listed MIME types enforced server-side.
+[DONE] Random UUID filenames — no user-controlled filenames reach storage, which
+       prevents path traversal and filename-collision attacks.
+[MISSING] No malware/virus scanning on uploaded files. Would need a third-party
+       scanner (ClamAV self-hosted, or a VirusTotal-style API) — a real gap, but
+       needs a hosting/infra decision, not something to silently wire up.
+[DONE] Uploaded images are re-encoded through sharp before storage
+       (uploads.service.ts stripImageMetadata) — this drops EXIF/IPTC/XMP
+       metadata, including GPS location, by default. GIFs are passed through
+       unprocessed since sharp only keeps the first frame of an animated GIF on
+       re-encode (would silently break multi-frame uploads).
+[DONE] MIME validation is by content inspection (magic bytes), not just declared
+       type/extension — see section 3.
+
+
+11. THIRD-PARTY INTEGRATION SECURITY
+----------------------------------------
+[DONE] OAuth (Google): standard authorization-code flow via passport-google-oauth20,
+       state parameter carries intended role rather than anything security-critical,
+       client secret stored server-side only.
+[DONE] Email (Resend): API-key auth, key is server-side only, never exposed to
+       the client.
+[DONE] File storage (Supabase): service-role key is server-side only.
+[DONE] Payments are handled as manual/offline confirmation, not a live payment
+       processor — this was a deliberate choice, and it means there's no card
+       data, no PCI-DSS scope, and no payment webhook signature-verification
+       surface to worry about. The tradeoff (covered in section 17) is that manual
+       confirmation is a human trust boundary, not a cryptographic one.
+[MISSING] No webhook signature verification exists for anything YET, but this
+       becomes relevant the moment any real payment processor, email provider
+       delivery webhook, or other signed-callback integration is added later —
+       flagging so it isn't forgotten when that day comes.
+
+
+12. DEPENDENCY & SUPPLY CHAIN SECURITY
+-------------------------------------------
+[DONE] `pnpm audit` wired into CI (.github/workflows/ci.yml) — blocking on
+       critical-severity findings (`--audit-level=critical`), informational-only
+       (non-blocking) on high-severity so those surface without breaking builds
+       on every transitive advisory. Dependabot config
+       (.github/dependabot.yml) also runs weekly for both npm packages and GitHub
+       Actions, grouping routine version bumps into one PR while letting security
+       patches land as their own.
+[MISSING] No Software Bill of Materials (SBOM) or dependency pinning policy beyond
+       the lockfile itself. Low priority at this scale.
+[PARTIAL] pnpm's allowBuilds policy in pnpm-workspace.yaml does explicitly gate
+       which packages are allowed to run postinstall scripts (a real supply-chain
+       protection against malicious postinstall scripts) — this is good practice
+       already in place, just worth calling out as deliberate rather than assuming
+       it's an oversight.
+
+
+13. ERROR HANDLING & INFORMATION DISCLOSURE
+------------------------------------------------
+[DONE] AllExceptionsFilter normalizes every error response to a consistent shape
+       and never leaks stack traces, internal file paths, or raw exception
+       messages to the client — unexpected errors always return the generic
+       "Internal server error" message regardless of what actually broke.
+[DONE] Swagger/API docs (/docs) are only mounted when NODE_ENV !== 'production' —
+       the API surface isn't self-documented to attackers in production.
+[MISSING] No verification that production NODE_ENV is actually set correctly
+       wherever this gets deployed — if it's ever left as 'development' in
+       production by mistake, the Swagger docs endpoint becomes live.
+
+
+14. LOGGING, MONITORING & INCIDENT RESPONSE
+------------------------------------------------
+[DONE] Sentry error tracking is wired into both apps/api and apps/web, capturing
+       real unhandled/5xx errors with sendDefaultPii:false (no user PII attached
+       to error reports by default).
+[DONE] Server-side errors are logged with Logger.error including stack traces
+       (server-side only — never sent to the client, see section 13).
+[MISSING] No centralized/structured application logging beyond Nest's default
+       console logger and Sentry's error capture — no log aggregation, no
+       searchable audit trail of normal (non-error) security-relevant events like
+       logins, password resets, role changes, or admin actions.
+[MISSING] No alerting/paging on suspicious patterns (e.g. a spike in failed
+       logins, a burst of 403s from one IP, unusual admin activity).
+[MISSING] No documented incident response plan — no runbook for "what do we do if
+       credentials leak / the DB is compromised / we get a report of an account
+       takeover."
+
+
+15. ADMIN PANEL & PRIVILEGED OPERATIONS
+--------------------------------------------
+[DONE] Admin-only endpoints are role-gated the same way as everything else
+       (@Roles(Role.ADMIN) + RolesGuard).
+[DONE] Admin accounts are never self-service — REGISTERABLE_ROLES excludes ADMIN,
+       so nobody can register their way into admin access through the public API.
+[DONE] Admin action audit log — see section 2.
+[DONE] 2FA is now required specifically for ADMIN accounts, enforced in
+       common/guards/roles.guard.ts: any route gated with @Roles(Role.ADMIN...)
+       throws 403 for an admin whose twoFactorEnabled is false. This doesn't
+       block login or 2FA enrollment itself (those routes carry no @Roles
+       decorator), so a fresh admin can always log in and set up 2FA — no
+       lockout risk. One asymmetry worth a follow-up: enabling 2FA doesn't itself
+       require password re-confirmation the way disabling it does (found during
+       this session's code review; low severity, only matters if a session is
+       already compromised).
+[MISSING] No IP allow-listing option for admin routes. Infra-level control
+       (reverse proxy or WAF rule), not something to build in application code.
+
+
+16. CLIENT-SIDE / FRONTEND SECURITY
+----------------------------------------
+[DONE] Access tokens are never written to localStorage/sessionStorage — held in
+       memory only, which limits the blast radius of a successful XSS (an
+       attacker who achieves script execution still can't read the token out of
+       storage, only intercept it live).
+[DONE] Refresh token is httpOnly, meaning client-side JavaScript can't read it at
+       all even if XSS is achieved.
+[DONE] React's default JSX escaping prevents reflected/stored XSS from user-
+       generated text content rendered normally (profile bios, chat messages,
+       feed captions) — confirmed no dangerouslySetInnerHTML usage was introduced
+       anywhere in this session's work.
+[MISSING] No Subresource Integrity (SRI) hashes on any externally-loaded scripts
+       (not currently a live risk since the app doesn't load third-party <script>
+       tags directly, but worth setting as a standing rule if that ever changes).
+[MISSING] No client-side rate limiting/debouncing on sensitive actions (repeated
+       login/password-reset submissions rely entirely on the server-side limiter).
+
+
+17. BUSINESS LOGIC & FRAUD PREVENTION
+------------------------------------------
+[PARTIAL] The manual/offline payment confirmation flow is a deliberate design
+       choice (see section 11) but it's worth being explicit about its actual
+       risk: it moves the trust boundary from "cryptographic proof of payment"
+       to "an admin looked at a reference number and clicked confirm." This is a
+       reasonable tradeoff for avoiding PCI scope, but it means the admin
+       confirmation step is a genuine fraud-prevention control, not a formality —
+       whoever operates this should have a real process for verifying payment
+       references against actual bank/transfer records, not just trusting
+       whatever the user typed in.
+[DONE] Certificate submission is rate-limited (5/hour per professional,
+       certificates.controller.ts) specifically to close this resubmission-spam
+       path.
+[MISSING] No duplicate-account detection (nothing currently stops one person from
+       registering many client accounts to manipulate reviews/likes/bookmarks on
+       the public feed, beyond normal auth).
+[MISSING] No review/rating authenticity checks (verifying a review author actually
+       had a completed project with that professional) if/when a review feature
+       is built.
+
+
+18. INFRASTRUCTURE & DEPLOYMENT SECURITY
+---------------------------------------------
+Explicitly out of scope for this document per how this project has been built
+(deployment was deferred throughout). Flagging what SHOULD be decided before
+this goes live, not solving it now:
+[MISSING] Hosting platform security posture (WAF, DDoS protection, network
+       isolation) — depends entirely on where this ends up deployed.
+[MISSING] Environment separation (dev/staging/production with different
+       credentials for each) — currently only one set of credentials exists.
+[MISSING] Principle of least privilege for whatever CI/CD deploy credentials get
+       created (a deploy token should not have more access than deploying
+       requires).
+
+
+19. PRIVACY & COMPLIANCE
+----------------------------
+[DONE] Privacy Policy and Terms of Service pages exist (/privacy, /terms) and
+       accurately describe what data is actually collected and how it's used —
+       see security note: these are a TEMPLATE, not lawyer-reviewed, and use
+       placeholder contact emails on a domain the project doesn't actually own.
+       Get real legal review before this is used with real users.
+[DONE] Self-service data export (GET /users/me/export, users.controller.ts —
+       GDPR portability) and account deletion (DELETE /users/me, password-
+       reconfirmed, soft delete, revokes all refresh tokens) both exist as
+       user-facing endpoints — no admin/developer action needed.
+[MISSING] No cookie consent banner (the refresh-token cookie is strictly
+       necessary for auth so likely doesn't legally require consent under most
+       frameworks, but this hasn't been reviewed against any specific
+       jurisdiction's requirements).
+
+
+20. SECURITY TESTING
+------------------------
+[PARTIAL] A real automated test suite now exists (apps/api/test/app.e2e-spec.ts,
+       apps/api/test/security.e2e-spec.ts, plus a starting unit suite) — see
+       section 2 for what security.e2e-spec.ts actually proves. Still narrow:
+       only one resource controller has IDOR coverage, and the unit suite is
+       essentially just a health-check. Expanding both, especially auth/authz
+       coverage across every controller as it's built, is the highest-value next
+       step here.
+[MISSING] No penetration test or third-party security review has been performed.
+[MISSING] No fuzzing or property-based testing of input validation.
+
+
+PRIORITY IF STARTING FROM HERE
+=================================
+Everything in the original 5-item list (per-route auth rate limits, admin audit
+log, explicit CSP, pnpm audit/Dependabot, and a start on automated auth tests) is
+now DONE — see sections 2, 5, 7, 12, 15, 20. What's left, in rough order of
+impact vs effort:
+  1. Expand security.e2e-spec.ts's IDOR coverage beyond project-requests to every
+     resource controller with an ownership check (section 2/20) — the pattern is
+     proven, it's now a matter of repeating it.
+  2. Fix the Google-OAuth-login + 2FA-enabled interaction, which currently fails
+     closed with a confusing 401 instead of prompting for the code (section 1).
+  3. Decide on a CAPTCHA provider for register/login/forgot-password (section 7)
+     — needs your call on which third-party service and its API key.
+  4. TLS/HSTS termination + real production NODE_ENV wherever this deploys
+     (sections 4 & 18) — the app-side header logic is ready, it just needs real
+     HTTPS in front of it.
+  5. A written incident-response runbook (section 14) — deliberately not drafted
+     here since it needs org-specific details (who's on call, who has authority
+     to rotate secrets/revoke sessions in a real incident) that only you can fill
+     in; happy to draft a starting skeleton if useful.
+  6. Legal review of the privacy/terms pages before any real users see them
+     (section 19) — still template content with placeholder contact emails.

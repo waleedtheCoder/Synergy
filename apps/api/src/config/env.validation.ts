@@ -12,12 +12,16 @@ export const envSchema = z.object({
 
   DATABASE_URL: z.string().min(1),
 
-  REDIS_URL: z.string().min(1),
-
   JWT_ACCESS_SECRET: z.string().min(1),
   JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
   JWT_REFRESH_SECRET: z.string().min(1),
   JWT_REFRESH_EXPIRES_IN: z.string().default('30d'),
+
+  // 32-byte (64 hex char) key used to encrypt sensitive fields at rest
+  // (currently: 2FA TOTP secrets). Generate with: openssl rand -hex 32
+  ENCRYPTION_KEY: z
+    .string()
+    .length(64, 'must be a 64-char hex string (32 bytes)'),
 
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
@@ -28,18 +32,14 @@ export const envSchema = z.object({
   SMTP_HOST: z.string().default('localhost'),
   SMTP_PORT: z.coerce.number().default(1025),
 
-  AWS_REGION: z.string().default('us-east-1'),
-  AWS_ACCESS_KEY_ID: z.string().optional(),
-  AWS_SECRET_ACCESS_KEY: z.string().optional(),
-  AWS_S3_BUCKET: z.string().optional(),
+  SUPABASE_URL: z.url(),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
+  SUPABASE_STORAGE_BUCKET: z.string().default('uploads'),
 
   MEILISEARCH_HOST: z.string().optional(),
   MEILISEARCH_API_KEY: z.string().optional(),
 
-  STRIPE_SECRET_KEY: z.string().optional(),
-  STRIPE_WEBHOOK_SECRET: z.string().optional(),
-
-  GOOGLE_MAPS_API_KEY: z.string().optional(),
+  SENTRY_DSN: z.string().optional(),
 
   THROTTLE_TTL: z.coerce.number().default(60000),
   THROTTLE_LIMIT: z.coerce.number().default(100),

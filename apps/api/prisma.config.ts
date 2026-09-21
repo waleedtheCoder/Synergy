@@ -8,6 +8,8 @@ export default defineConfig({
     seed: 'ts-node --transpile-only prisma/seed.ts',
   },
   datasource: {
-    url: env('DATABASE_URL'),
+    // CLI commands (migrate, db pull, studio) need a non-pooled connection;
+    // the app itself connects via DATABASE_URL (pgbouncer) in PrismaService.
+    url: env('DIRECT_URL'),
   },
 });

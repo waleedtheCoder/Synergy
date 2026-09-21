@@ -5,13 +5,17 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AdminAuditLogService } from './admin-audit-log.service';
 import type { CreateSkillDto } from './dto/create-skill.dto';
 
 @Injectable()
 export class AdminSkillsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLog: AdminAuditLogService,
+  ) {}
 
-  async create(dto: CreateSkillDto) {
+  async create(dto: CreateSkillDto, adminId: string, ipAddress?: string) {
     const existing = await this.prisma.skill.findUnique({
       where: { name: dto.name },
     });
@@ -19,10 +23,23 @@ export class AdminSkillsService {
       throw new ConflictException('A skill with this name already exists');
     }
 
-    return this.prisma.skill.create({ data: { name: dto.name } });
+    const created = await this.prisma.skill.create({
+      data: { name: dto.name },
+    });
+
+    await this.auditLog.log({
+      adminId,
+      action: 'skill.create',
+      targetType: 'skill',
+      targetId: created.id,
+      metadata: { name: dto.name },
+      ipAddress,
+    });
+
+    return created;
   }
 
-  async remove(id: string) {
+  async remove(id: string, adminId: string, ipAddress?: string) {
     const skill = await this.prisma.skill.findUnique({
       where: { id },
       include: { _count: { select: { professionals: true } } },
@@ -37,5 +54,13 @@ export class AdminSkillsService {
     }
 
     await this.prisma.skill.delete({ where: { id } });
+    await this.auditLog.log({
+      adminId,
+      action: 'skill.delete',
+      targetType: 'skill',
+      targetId: id,
+      metadata: { name: skill.name },
+      ipAddress,
+    });
   }
 }

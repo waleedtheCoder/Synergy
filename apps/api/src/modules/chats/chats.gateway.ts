@@ -9,6 +9,7 @@ import {
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
+  WsException,
 } from '@nestjs/websockets';
 import type { Server, Socket } from 'socket.io';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -29,6 +30,14 @@ function chatRoom(chatId: string): string {
   return `chat:${chatId}`;
 }
 
+// WebSocket handlers sit outside the HTTP ThrottlerGuard entirely, so
+// message:send needs its own limiter — otherwise a script could blast a
+// chat room unbounded. Per-user, in-memory sliding window; fine for a
+// single-instance deployment, would need a shared store (e.g. Redis) behind
+// a load balancer with multiple API instances.
+const MESSAGE_RATE_LIMIT = 20;
+const MESSAGE_RATE_WINDOW_MS = 10_000;
+
 @WebSocketGateway({ namespace: '/chat', cors: { origin: true } })
 @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
@@ -36,6 +45,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   server: Server;
 
   private readonly logger = new Logger(ChatGateway.name);
+  private readonly messageTimestamps = new Map<string, number[]>();
 
   constructor(
     private readonly jwtService: JwtService,
@@ -78,13 +88,29 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
-  handleDisconnect() {}
+  handleDisconnect(client: AuthenticatedSocket) {
+    if (client.data.user) {
+      this.messageTimestamps.delete(client.data.user.id);
+    }
+  }
 
   private getUser(client: AuthenticatedSocket): SocketUser {
     if (!client.data.user) {
       throw new Error('Socket is not authenticated');
     }
     return client.data.user;
+  }
+
+  private assertUnderMessageRateLimit(userId: string): void {
+    const now = Date.now();
+    const recent = (this.messageTimestamps.get(userId) ?? []).filter(
+      (ts) => now - ts < MESSAGE_RATE_WINDOW_MS,
+    );
+    if (recent.length >= MESSAGE_RATE_LIMIT) {
+      throw new WsException('Too many messages — slow down');
+    }
+    recent.push(now);
+    this.messageTimestamps.set(userId, recent);
   }
 
   @SubscribeMessage('chat:join')
@@ -111,6 +137,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() dto: SendMessageDto,
   ) {
     const user = this.getUser(client);
+    this.assertUnderMessageRateLimit(user.id);
     const message = await this.chatsService.createMessage(
       user.id,
       user.role,

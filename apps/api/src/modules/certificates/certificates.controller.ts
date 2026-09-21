@@ -11,6 +11,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { TransformInterceptor } from '../../common/interceptors/transform.interceptor';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -27,6 +28,7 @@ export class CertificatesController {
   constructor(private readonly certificatesService: CertificatesService) {}
 
   @Post()
+  @Throttle({ default: { limit: 5, ttl: 3_600_000 } })
   @ApiOperation({ summary: 'Add a certificate' })
   create(@CurrentUser('id') userId: string, @Body() dto: CreateCertificateDto) {
     return this.certificatesService.create(userId, dto);

@@ -9,6 +9,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { TransformInterceptor } from '../../common/interceptors/transform.interceptor';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -26,6 +27,7 @@ export class QuotationsController {
 
   @Post()
   @Roles(Role.PROFESSIONAL)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @ApiOperation({ summary: 'Send a quotation in a chat' })
   create(
     @CurrentUser('id') userId: string,

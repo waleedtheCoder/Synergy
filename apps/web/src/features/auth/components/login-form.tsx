@@ -25,6 +25,7 @@ import {
 import { ROUTES } from "@/constants/routes";
 import { useLogin } from "../hooks";
 import { loginSchema, type LoginInput } from "../schemas";
+import { GoogleAuthButton } from "./google-auth-button";
 
 export function LoginForm() {
   const router = useRouter();
@@ -89,6 +90,12 @@ export function LoginForm() {
             </Button>
           </form>
         </Form>
+        <div className="my-4 flex items-center gap-3">
+          <div className="h-px flex-1 bg-border" />
+          <span className="text-xs text-muted-foreground">or</span>
+          <div className="h-px flex-1 bg-border" />
+        </div>
+        <GoogleAuthButton />
         <p className="mt-6 text-center text-sm text-muted-foreground">
           Don&apos;t have an account?{" "}
           <Link href={ROUTES.register} className="font-medium text-primary hover:underline">

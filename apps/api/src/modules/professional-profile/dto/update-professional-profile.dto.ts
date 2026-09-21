@@ -13,22 +13,26 @@ import {
   Min,
 } from 'class-validator';
 import { AvailabilityStatus, ResponseTime } from '../../../../generated/prisma';
+import { StripHtml } from '../../../common/decorators/strip-html.decorator';
 
 export class UpdateProfessionalProfileDto {
   @ApiPropertyOptional({ maxLength: 150 })
   @IsOptional()
+  @StripHtml()
   @IsString()
   @MaxLength(150)
   businessName?: string;
 
   @ApiPropertyOptional({ maxLength: 150 })
   @IsOptional()
+  @StripHtml()
   @IsString()
   @MaxLength(150)
   tagline?: string;
 
   @ApiPropertyOptional({ maxLength: 3000 })
   @IsOptional()
+  @StripHtml()
   @IsString()
   @MaxLength(3000)
   about?: string;

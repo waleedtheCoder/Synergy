@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { paginate } from '../../common/dto/pagination-query.dto';
+import { AdminAuditLogService } from './admin-audit-log.service';
 import {
   CampaignStatus,
   PaymentStatus,
@@ -22,6 +23,7 @@ export class AdminPaymentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
+    private readonly auditLog: AdminAuditLogService,
   ) {}
 
   private async notify(
@@ -102,7 +104,7 @@ export class AdminPaymentsService {
     return payment;
   }
 
-  async confirm(id: string, adminId: string) {
+  async confirm(id: string, adminId: string, ipAddress?: string) {
     const payment = await this.getPendingPayment(id);
 
     const updated = await this.prisma.payment.update({
@@ -126,11 +128,19 @@ export class AdminPaymentsService {
     }
 
     void this.notify(id, 'confirmed');
+    await this.auditLog.log({
+      adminId,
+      action: 'payment.confirm',
+      targetType: 'payment',
+      targetId: id,
+      metadata: { amount: payment.amount.toString(), type: payment.type },
+      ipAddress,
+    });
     return updated;
   }
 
-  async reject(id: string, adminId: string) {
-    await this.getPendingPayment(id);
+  async reject(id: string, adminId: string, ipAddress?: string) {
+    const payment = await this.getPendingPayment(id);
 
     const updated = await this.prisma.payment.update({
       where: { id },
@@ -142,10 +152,18 @@ export class AdminPaymentsService {
     });
 
     void this.notify(id, 'rejected');
+    await this.auditLog.log({
+      adminId,
+      action: 'payment.reject',
+      targetType: 'payment',
+      targetId: id,
+      metadata: { amount: payment.amount.toString(), type: payment.type },
+      ipAddress,
+    });
     return updated;
   }
 
-  async refund(id: string, adminId: string) {
+  async refund(id: string, adminId: string, ipAddress?: string) {
     const payment = await this.prisma.payment.findUnique({ where: { id } });
     if (!payment) {
       throw new NotFoundException('Payment not found');
@@ -186,6 +204,14 @@ export class AdminPaymentsService {
     }
 
     void this.notify(id, 'refunded');
+    await this.auditLog.log({
+      adminId,
+      action: 'payment.refund',
+      targetType: 'payment',
+      targetId: id,
+      metadata: { amount: payment.amount.toString(), type: payment.type },
+      ipAddress,
+    });
     return updated;
   }
 }

@@ -1,9 +1,12 @@
 import {
+  BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
+  Param,
   Post,
   Req,
   Res,
@@ -13,12 +16,15 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import type { Request, Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
+import * as QRCode from 'qrcode';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
+import { Confirm2faDto } from './dto/confirm-2fa.dto';
+import { Disable2faDto } from './dto/disable-2fa.dto';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
@@ -66,6 +72,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { limit: 10, ttl: 3_600_000 } })
   @Post('register')
   @ApiOperation({ summary: 'Create a client or professional account' })
   async register(
@@ -91,7 +98,11 @@ export class AuthController {
       dto.email,
       dto.password,
     );
-    const result = await this.authService.login(user, this.requestMeta(req));
+    const result = await this.authService.login(
+      user,
+      this.requestMeta(req),
+      dto.otpCode,
+    );
     return this.respondWithTokens(res, result);
   }
 
@@ -147,11 +158,93 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Reset a password using a reset token' })
   async resetPassword(@Body() dto: ResetPasswordDto) {
     await this.authService.resetPassword(dto.token, dto.password);
+    return { success: true, data: null };
+  }
+
+  // ── Two-factor authentication ───────────────────────────────────────
+
+  @Post('2fa/setup')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Start TOTP two-factor setup and get a QR code' })
+  async setupTwoFactor(@CurrentUser() user: AuthenticatedUser) {
+    const { otpauthUrl } = await this.authService.setupTwoFactor(
+      user.id,
+      user.email,
+    );
+    const qrCodeDataUrl = await QRCode.toDataURL(otpauthUrl);
+    return { success: true, data: { otpauthUrl, qrCodeDataUrl } };
+  }
+
+  @Post('2fa/confirm')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Confirm TOTP setup and enable two-factor auth' })
+  async confirmTwoFactor(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: Confirm2faDto,
+  ) {
+    const result = await this.authService.confirmTwoFactor(user.id, dto.code);
+    return { success: true, data: result };
+  }
+
+  @Post('2fa/disable')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Disable two-factor authentication' })
+  async disableTwoFactor(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: Disable2faDto,
+  ) {
+    await this.authService.disableTwoFactor(user.id, dto.password, dto.code);
+    return { success: true, data: null };
+  }
+
+  // ── Active sessions ──────────────────────────────────────────────────
+
+  @Get('sessions')
+  @ApiOperation({
+    summary: 'List active sessions (refresh tokens) for this account',
+  })
+  async listSessions(
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() req: Request,
+  ) {
+    const raw = (req.cookies as Record<string, string> | undefined)?.[
+      REFRESH_TOKEN_COOKIE
+    ];
+    const sessions = await this.authService.listSessions(user.id, raw);
+    return { success: true, data: sessions };
+  }
+
+  @Delete('sessions/:id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Revoke a single session by id' })
+  async revokeSession(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    if (!id) {
+      throw new BadRequestException('Session id is required');
+    }
+    await this.authService.revokeSession(user.id, id);
+    return { success: true, data: null };
+  }
+
+  @Post('sessions/revoke-all')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Revoke every session except the current one' })
+  async revokeAllSessions(
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() req: Request,
+  ) {
+    const raw = (req.cookies as Record<string, string> | undefined)?.[
+      REFRESH_TOKEN_COOKIE
+    ];
+    await this.authService.revokeAllOtherSessions(user.id, raw);
     return { success: true, data: null };
   }
 

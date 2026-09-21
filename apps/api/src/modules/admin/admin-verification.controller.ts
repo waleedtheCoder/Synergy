@@ -5,11 +5,14 @@ import {
   Param,
   Patch,
   Query,
+  Req,
   UseInterceptors,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Request } from 'express';
 import { TransformInterceptor } from '../../common/interceptors/transform.interceptor';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Role } from '../../../generated/prisma';
 import { AdminVerificationService } from './admin-verification.service';
 import { QueryProfessionalsDto } from './dto/query-professionals.dto';
@@ -36,10 +39,14 @@ export class AdminVerificationController {
   setProfessionalVerified(
     @Param('id') id: string,
     @Body() dto: SetVerifiedDto,
+    @CurrentUser('id') adminId: string,
+    @Req() req: Request,
   ) {
     return this.adminVerificationService.setProfessionalVerified(
       id,
       dto.verified,
+      adminId,
+      req.ip,
     );
   }
 
@@ -51,10 +58,17 @@ export class AdminVerificationController {
 
   @Patch('certificates/:id')
   @ApiOperation({ summary: 'Verify or unverify a certificate' })
-  setCertificateVerified(@Param('id') id: string, @Body() dto: SetVerifiedDto) {
+  setCertificateVerified(
+    @Param('id') id: string,
+    @Body() dto: SetVerifiedDto,
+    @CurrentUser('id') adminId: string,
+    @Req() req: Request,
+  ) {
     return this.adminVerificationService.setCertificateVerified(
       id,
       dto.verified,
+      adminId,
+      req.ip,
     );
   }
 }

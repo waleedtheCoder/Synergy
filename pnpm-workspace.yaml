@@ -1,9 +1,17 @@
 packages:
   - "apps/*"
   - "packages/*"
+# Force transitive dependencies with known high/critical vulnerabilities to
+# patched versions that upstream (@nestjs/platform-express) hasn't bumped to
+# yet. Re-check `pnpm audit --audit-level=high` after any lockfile update —
+# these overrides only help until upstream catches up, and pin us to a
+# specific patched line in the meantime.
+overrides:
+  multer: ">=2.4.0"
 allowBuilds:
   '@prisma/engines': true
   '@scarf/scarf': false
+  '@sentry/cli': false
   msgpackr-extract: true
   prisma: true
   sharp: true

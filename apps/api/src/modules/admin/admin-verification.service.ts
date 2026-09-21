@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { paginate } from '../../common/dto/pagination-query.dto';
 import { SearchService } from '../search/search.service';
+import { AdminAuditLogService } from './admin-audit-log.service';
 import type { QueryProfessionalsDto } from './dto/query-professionals.dto';
 import type { QueryCertificatesDto } from './dto/query-certificates.dto';
 
@@ -18,6 +19,7 @@ export class AdminVerificationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly searchService: SearchService,
+    private readonly auditLog: AdminAuditLogService,
   ) {}
 
   async findProfessionals(query: QueryProfessionalsDto) {
@@ -54,7 +56,12 @@ export class AdminVerificationService {
     return paginate(items, total, query);
   }
 
-  async setProfessionalVerified(id: string, verified: boolean) {
+  async setProfessionalVerified(
+    id: string,
+    verified: boolean,
+    adminId: string,
+    ipAddress?: string,
+  ) {
     const profile = await this.prisma.professionalProfile.findUnique({
       where: { id },
     });
@@ -68,6 +75,14 @@ export class AdminVerificationService {
     });
 
     void this.searchService.indexProfessionalById(id);
+    await this.auditLog.log({
+      adminId,
+      action: 'professional.verified.set',
+      targetType: 'professionalProfile',
+      targetId: id,
+      metadata: { from: profile.verified, to: verified },
+      ipAddress,
+    });
 
     return updated;
   }
@@ -99,7 +114,12 @@ export class AdminVerificationService {
     return paginate(items, total, query);
   }
 
-  async setCertificateVerified(id: string, verified: boolean) {
+  async setCertificateVerified(
+    id: string,
+    verified: boolean,
+    adminId: string,
+    ipAddress?: string,
+  ) {
     const certificate = await this.prisma.certificate.findUnique({
       where: { id },
     });
@@ -107,9 +127,20 @@ export class AdminVerificationService {
       throw new NotFoundException('Certificate not found');
     }
 
-    return this.prisma.certificate.update({
+    const updated = await this.prisma.certificate.update({
       where: { id },
       data: { verified },
     });
+
+    await this.auditLog.log({
+      adminId,
+      action: 'certificate.verified.set',
+      targetType: 'certificate',
+      targetId: id,
+      metadata: { from: certificate.verified, to: verified },
+      ipAddress,
+    });
+
+    return updated;
   }
 }

@@ -5,11 +5,14 @@ import {
   Param,
   Patch,
   Query,
+  Req,
   UseInterceptors,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Request } from 'express';
 import { TransformInterceptor } from '../../common/interceptors/transform.interceptor';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Role } from '../../../generated/prisma';
 import { AdminUsersService } from './admin-users.service';
 import { QueryUsersDto } from './dto/query-users.dto';
@@ -36,7 +39,12 @@ export class AdminUsersController {
 
   @Patch(':id/status')
   @ApiOperation({ summary: 'Update a user status (suspend/activate/etc.)' })
-  updateStatus(@Param('id') id: string, @Body() dto: UpdateUserStatusDto) {
-    return this.adminUsersService.updateStatus(id, dto);
+  updateStatus(
+    @Param('id') id: string,
+    @Body() dto: UpdateUserStatusDto,
+    @CurrentUser('id') adminId: string,
+    @Req() req: Request,
+  ) {
+    return this.adminUsersService.updateStatus(id, dto, adminId, req.ip);
   }
 }

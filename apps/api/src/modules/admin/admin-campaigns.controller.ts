@@ -5,11 +5,14 @@ import {
   Param,
   Patch,
   Query,
+  Req,
   UseInterceptors,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Request } from 'express';
 import { TransformInterceptor } from '../../common/interceptors/transform.interceptor';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Role } from '../../../generated/prisma';
 import { AdminCampaignsService } from './admin-campaigns.service';
 import { QueryCampaignsDto } from '../advertising/dto/query-campaigns.dto';
@@ -30,7 +33,12 @@ export class AdminCampaignsController {
 
   @Patch(':id/status')
   @ApiOperation({ summary: 'Approve, reject, pause, or complete a campaign' })
-  updateStatus(@Param('id') id: string, @Body() dto: UpdateCampaignStatusDto) {
-    return this.adminCampaignsService.updateStatus(id, dto);
+  updateStatus(
+    @Param('id') id: string,
+    @Body() dto: UpdateCampaignStatusDto,
+    @CurrentUser('id') adminId: string,
+    @Req() req: Request,
+  ) {
+    return this.adminCampaignsService.updateStatus(id, dto, adminId, req.ip);
   }
 }

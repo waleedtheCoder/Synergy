@@ -7,11 +7,14 @@ import {
   Param,
   Patch,
   Post,
+  Req,
   UseInterceptors,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Request } from 'express';
 import { TransformInterceptor } from '../../common/interceptors/transform.interceptor';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Role } from '../../../generated/prisma';
 import { AdminCategoriesService } from './admin-categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
@@ -28,21 +31,34 @@ export class AdminCategoriesController {
 
   @Post()
   @ApiOperation({ summary: 'Create a category' })
-  create(@Body() dto: CreateCategoryDto) {
-    return this.adminCategoriesService.create(dto);
+  create(
+    @Body() dto: CreateCategoryDto,
+    @CurrentUser('id') adminId: string,
+    @Req() req: Request,
+  ) {
+    return this.adminCategoriesService.create(dto, adminId, req.ip);
   }
 
   @Patch(':id')
   @ApiOperation({ summary: 'Update a category' })
-  update(@Param('id') id: string, @Body() dto: UpdateCategoryDto) {
-    return this.adminCategoriesService.update(id, dto);
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateCategoryDto,
+    @CurrentUser('id') adminId: string,
+    @Req() req: Request,
+  ) {
+    return this.adminCategoriesService.update(id, dto, adminId, req.ip);
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Delete a category' })
-  async remove(@Param('id') id: string) {
-    await this.adminCategoriesService.remove(id);
+  async remove(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Req() req: Request,
+  ) {
+    await this.adminCategoriesService.remove(id, adminId, req.ip);
     return null;
   }
 }

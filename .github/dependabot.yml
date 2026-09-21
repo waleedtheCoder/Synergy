@@ -1,0 +1,22 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      # Security patches land immediately as their own PRs; everything else
+      # groups into one weekly PR so routine bumps don't create dozens of
+      # individual reviews.
+      production-dependencies:
+        applies-to: version-updates
+        dependency-type: "production"
+      development-dependencies:
+        applies-to: version-updates
+        dependency-type: "development"
+    open-pull-requests-limit: 10
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"

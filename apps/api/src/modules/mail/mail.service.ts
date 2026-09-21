@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { Resend } from 'resend';
 import * as nodemailer from 'nodemailer';
 import {
+  newLoginAlertEmailTemplate,
+  passwordChangedEmailTemplate,
   passwordResetEmailTemplate,
   verificationEmailTemplate,
 } from './templates/auth-email.templates';
@@ -69,6 +71,25 @@ export class MailService {
     resetUrl: string,
   ): Promise<void> {
     const { subject, html } = passwordResetEmailTemplate(firstName, resetUrl);
+    await this.send(to, subject, html);
+  }
+
+  async sendNewLoginAlertEmail(
+    to: string,
+    firstName: string,
+    userAgent: string | undefined,
+    ipAddress: string | undefined,
+  ): Promise<void> {
+    const { subject, html } = newLoginAlertEmailTemplate(
+      firstName,
+      userAgent ?? 'Unknown device',
+      ipAddress ?? 'Unknown location',
+    );
+    await this.send(to, subject, html);
+  }
+
+  async sendPasswordChangedEmail(to: string, firstName: string): Promise<void> {
+    const { subject, html } = passwordChangedEmailTemplate(firstName);
     await this.send(to, subject, html);
   }
 

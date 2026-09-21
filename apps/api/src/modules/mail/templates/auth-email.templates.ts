@@ -58,3 +58,36 @@ export function passwordResetEmailTemplate(
     ),
   };
 }
+
+export function newLoginAlertEmailTemplate(
+  firstName: string,
+  device: string,
+  location: string,
+): { subject: string; html: string } {
+  return {
+    subject: 'New sign-in to your Synergi account',
+    html: shell(
+      `Hi ${firstName},`,
+      `<p style="font-size:14px;line-height:1.6;color:#555;">We noticed a sign-in to your account from a device or location we haven't seen before.</p>
+       <p style="font-size:13px;line-height:1.6;color:#333;background:#f7f7f5;border-radius:8px;padding:12px 16px;margin-top:12px;">
+         <strong>Device:</strong> ${device}<br/>
+         <strong>Location/IP:</strong> ${location}
+       </p>
+       <p style="font-size:12px;color:#999;margin-top:24px;">If this was you, no action is needed. If you don't recognize this activity, reset your password immediately and review your active sessions.</p>`,
+    ),
+  };
+}
+
+export function passwordChangedEmailTemplate(firstName: string): {
+  subject: string;
+  html: string;
+} {
+  return {
+    subject: 'Your Synergi password was changed',
+    html: shell(
+      `Hi ${firstName},`,
+      `<p style="font-size:14px;line-height:1.6;color:#555;">Your Synergi account password was just changed, and all of your active sessions have been signed out for your security.</p>
+       <p style="font-size:12px;color:#999;margin-top:24px;">If you made this change, no action is needed. If you didn't, please contact support immediately.</p>`,
+    ),
+  };
+}

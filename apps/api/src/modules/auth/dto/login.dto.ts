@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsString, MinLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class LoginDto {
   @ApiProperty()
@@ -10,4 +10,12 @@ export class LoginDto {
   @IsString()
   @MinLength(1)
   password: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Required if the account has two-factor authentication enabled',
+  })
+  @IsOptional()
+  @IsString()
+  otpCode?: string;
 }
