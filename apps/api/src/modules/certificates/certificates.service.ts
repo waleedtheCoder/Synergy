@@ -1,12 +1,16 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { paginate } from '../../common/dto/pagination-query.dto';
+import { RagIndexService } from '../ai/rag-index.service';
 import type { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import type { CreateCertificateDto } from './dto/create-certificate.dto';
 
 @Injectable()
 export class CertificatesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly ragIndex: RagIndexService,
+  ) {}
 
   private async getProfessionalId(userId: string): Promise<string> {
     const profile = await this.prisma.professionalProfile.findUnique({
@@ -24,9 +28,11 @@ export class CertificatesService {
   async create(userId: string, dto: CreateCertificateDto) {
     const professionalId = await this.getProfessionalId(userId);
 
-    return this.prisma.certificate.create({
+    const certificate = await this.prisma.certificate.create({
       data: { professionalId, ...dto },
     });
+    void this.ragIndex.indexCertificate(certificate.id);
+    return certificate;
   }
 
   async findMine(userId: string, query: PaginationQueryDto) {
@@ -57,5 +63,6 @@ export class CertificatesService {
     }
 
     await this.prisma.certificate.delete({ where: { id } });
+    void this.ragIndex.indexCertificate(id);
   }
 }

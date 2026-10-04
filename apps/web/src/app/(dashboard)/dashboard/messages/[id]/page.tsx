@@ -13,6 +13,7 @@ import { participantName } from "@/features/chats/participant-name";
 import { MessageBubble } from "@/features/chats/components/message-bubble";
 import { QuotationFormDialog } from "@/features/quotations/components/quotation-form-dialog";
 import { MeetingFormDialog } from "@/features/meetings/components/meeting-form-dialog";
+import { ChatAssistantDialog } from "@/features/ai/components/chat-assistant-dialog";
 
 export default function ChatThreadPage() {
   const params = useParams<{ id: string }>();
@@ -63,6 +64,7 @@ export default function ChatThreadPage() {
           </AvatarFallback>
         </Avatar>
         <p className="font-semibold text-foreground">{counterpartName}</p>
+        <ChatAssistantDialog chatId={chatId} />
       </div>
 
       <div className="flex-1 space-y-3 overflow-y-auto py-4">

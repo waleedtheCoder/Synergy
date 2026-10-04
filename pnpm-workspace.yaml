@@ -13,6 +13,8 @@ allowBuilds:
   '@scarf/scarf': false
   '@sentry/cli': false
   msgpackr-extract: true
+  onnxruntime-node: true
   prisma: true
+  protobufjs: true
   sharp: true
   unrs-resolver: true

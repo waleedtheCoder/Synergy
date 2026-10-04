@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { paginate } from '../../common/dto/pagination-query.dto';
+import { RagIndexService } from '../ai/rag-index.service';
 import type { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import type { CreatePortfolioProjectDto } from './dto/create-portfolio-project.dto';
 import type { UpdatePortfolioProjectDto } from './dto/update-portfolio-project.dto';
@@ -16,7 +17,10 @@ const LIST_INCLUDE = {
 
 @Injectable()
 export class PortfolioProjectsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly ragIndex: RagIndexService,
+  ) {}
 
   private async getProfessionalId(userId: string): Promise<string> {
     const profile = await this.prisma.professionalProfile.findUnique({
@@ -62,7 +66,7 @@ export class PortfolioProjectsService {
     this.assertBudgetRange(dto);
     const { images, ...fields } = dto;
 
-    return this.prisma.portfolioProject.create({
+    const project = await this.prisma.portfolioProject.create({
       data: {
         professionalId,
         ...fields,
@@ -70,6 +74,8 @@ export class PortfolioProjectsService {
       },
       include: LIST_INCLUDE,
     });
+    void this.ragIndex.indexPortfolioProject(project.id);
+    return project;
   }
 
   async findMine(userId: string, query: PaginationQueryDto) {
@@ -118,6 +124,7 @@ export class PortfolioProjectsService {
           ]
         : []),
     ]);
+    void this.ragIndex.indexPortfolioProject(id);
 
     return this.getOwned(userId, id);
   }
@@ -125,5 +132,6 @@ export class PortfolioProjectsService {
   async remove(userId: string, id: string): Promise<void> {
     await this.getOwned(userId, id);
     await this.prisma.portfolioProject.delete({ where: { id } });
+    void this.ragIndex.indexPortfolioProject(id);
   }
 }

@@ -13,6 +13,7 @@ import {
   type Prisma,
 } from '../../../generated/prisma';
 import { AnalyticsService } from '../analytics/analytics.service';
+import { RagIndexService } from '../ai/rag-index.service';
 import type { CreateChatDto } from './dto/create-chat.dto';
 
 const PARTICIPANT_INCLUDE = {
@@ -53,6 +54,7 @@ export class ChatsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly analyticsService: AnalyticsService,
+    private readonly ragIndex: RagIndexService,
   ) {}
 
   async getMyProfileId(userId: string, role: Role): Promise<string> {
@@ -263,6 +265,7 @@ export class ChatsService {
       content.length > 140 ? `${content.slice(0, 140)}…` : content,
       { chatId },
     );
+    void this.ragIndex.indexMessage(message.id);
 
     return message;
   }

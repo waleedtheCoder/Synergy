@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { paginate } from '../../common/dto/pagination-query.dto';
+import { RagIndexService } from '../ai/rag-index.service';
 import type { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import type { CreateServiceDto } from './dto/create-service.dto';
 import type { UpdateServiceDto } from './dto/update-service.dto';
@@ -15,7 +16,10 @@ const LIST_INCLUDE = {
 
 @Injectable()
 export class ServicesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly ragIndex: RagIndexService,
+  ) {}
 
   private async getProfessionalId(userId: string): Promise<string> {
     const profile = await this.prisma.professionalProfile.findUnique({
@@ -60,10 +64,12 @@ export class ServicesService {
     const professionalId = await this.getProfessionalId(userId);
     this.assertPriceRange(dto);
 
-    return this.prisma.service.create({
+    const service = await this.prisma.service.create({
       data: { professionalId, ...dto },
       include: LIST_INCLUDE,
     });
+    void this.ragIndex.indexService(service.id);
+    return service;
   }
 
   async findMine(userId: string, query: PaginationQueryDto) {
@@ -91,15 +97,18 @@ export class ServicesService {
     await this.getOwned(userId, id);
     this.assertPriceRange(dto);
 
-    return this.prisma.service.update({
+    const service = await this.prisma.service.update({
       where: { id },
       data: dto,
       include: LIST_INCLUDE,
     });
+    void this.ragIndex.indexService(id);
+    return service;
   }
 
   async remove(userId: string, id: string): Promise<void> {
     await this.getOwned(userId, id);
     await this.prisma.service.delete({ where: { id } });
+    void this.ragIndex.indexService(id);
   }
 }

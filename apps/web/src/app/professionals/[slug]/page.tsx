@@ -15,6 +15,7 @@ import { useAddFavorite } from "@/features/dashboard/hooks";
 import { useStartChat } from "@/features/chats/hooks";
 import { usePublicProfessional } from "@/features/professionals/hooks";
 import { AdSlot } from "@/features/advertising/components/ad-slot";
+import { AskProfessional } from "@/features/ai/components/ask-professional";
 
 const AVAILABILITY_CONFIG = {
   AVAILABLE: { label: "Available", variant: "default" as const },
@@ -215,6 +216,8 @@ export default function PublicProfessionalPage() {
                 </div>
               </div>
             )}
+
+            <AskProfessional professionalId={profile.id} name={displayName} />
 
             <div className="mt-10">
               <AdSlot placement="PROFESSIONAL_PROFILE" />

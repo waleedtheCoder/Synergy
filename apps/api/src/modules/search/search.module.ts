@@ -8,6 +8,6 @@ import { MeilisearchService } from './meilisearch.service';
   imports: [AnalyticsModule],
   controllers: [SearchController],
   providers: [MeilisearchService, SearchService],
-  exports: [SearchService],
+  exports: [SearchService, MeilisearchService],
 })
 export class SearchModule {}

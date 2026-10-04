@@ -45,6 +45,10 @@ export const envSchema = z.object({
   // useful for local dev/CI where no Cloudflare account is configured.
   TURNSTILE_SECRET_KEY: z.string().optional(),
 
+  // Unset disables the AI/RAG endpoints (they return 503); embeddings are
+  // computed locally and keep indexing either way.
+  ANTHROPIC_API_KEY: z.string().optional(),
+
   THROTTLE_TTL: z.coerce.number().default(60000),
   THROTTLE_LIMIT: z.coerce.number().default(100),
 });

@@ -10,6 +10,7 @@ import { PageHeader } from "@/features/dashboard/components/page-header";
 import { EmptyState } from "@/features/dashboard/components/empty-state";
 import { useAdminReports, useResolveAdminReport } from "@/features/admin/hooks";
 import { ReportStatusBadge } from "@/features/admin/components/status-badges";
+import { ReportAssessmentPanel } from "@/features/ai/components/moderation-assessment";
 
 const STATUS_FILTERS: { label: string; value: ReportStatus | undefined }[] = [
   { label: "All", value: undefined },
@@ -85,6 +86,11 @@ export default function AdminReportsPage() {
                 </div>
               )}
             </CardContent>
+            {report.status === "PENDING" && (
+              <div className="mt-3">
+                <ReportAssessmentPanel reportId={report.id} />
+              </div>
+            )}
           </Card>
         ))}
       </div>

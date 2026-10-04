@@ -31,6 +31,8 @@ import { SubscriptionsModule } from './modules/subscriptions/subscriptions.modul
 import { PaymentsModule } from './modules/payments/payments.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
+import { AiIndexModule } from './modules/ai/ai-index.module';
+import { AiModule } from './modules/ai/ai.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
@@ -73,6 +75,8 @@ import { AllExceptionsFilter } from './common/filters/http-exception.filter';
     PaymentsModule,
     AnalyticsModule,
     UploadsModule,
+    AiIndexModule,
+    AiModule,
   ],
   controllers: [AppController],
   providers: [

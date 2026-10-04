@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { paginate } from '../../common/dto/pagination-query.dto';
+import { RagIndexService } from '../ai/rag-index.service';
 import { AdminAuditLogService } from './admin-audit-log.service';
 import type { QueryReportsDto } from './dto/query-reports.dto';
 import type { ResolveReportDto } from './dto/resolve-report.dto';
@@ -10,6 +11,7 @@ export class AdminReportsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLog: AdminAuditLogService,
+    private readonly ragIndex: RagIndexService,
   ) {}
 
   async findAll(query: QueryReportsDto) {
@@ -57,6 +59,8 @@ export class AdminReportsService {
       metadata: { from: report.status, to: dto.status },
       ipAddress,
     });
+    // Decided reports become precedents for the moderation assistant.
+    void this.ragIndex.indexReport(id);
 
     return updated;
   }

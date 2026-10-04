@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { paginate } from '../../common/dto/pagination-query.dto';
 import { DisputeStatus } from '../../../generated/prisma';
+import { RagIndexService } from '../ai/rag-index.service';
 import { AdminAuditLogService } from './admin-audit-log.service';
 import type { QueryDisputesDto } from './dto/query-disputes.dto';
 import type { ResolveDisputeDto } from './dto/resolve-dispute.dto';
@@ -15,6 +16,7 @@ export class AdminDisputesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLog: AdminAuditLogService,
+    private readonly ragIndex: RagIndexService,
   ) {}
 
   async findAll(query: QueryDisputesDto) {
@@ -66,6 +68,8 @@ export class AdminDisputesService {
       metadata: { from: dispute.status, to: dto.status },
       ipAddress,
     });
+    // Decided disputes become precedents for the moderation assistant.
+    void this.ragIndex.indexDispute(id);
 
     return updated;
   }

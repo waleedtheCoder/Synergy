@@ -17,6 +17,7 @@ import {
 import { ROUTES } from "@/constants/routes";
 import { useCancelProjectRequest, useProjectRequest } from "@/features/project-requests/hooks";
 import { ProjectRequestStatusBadge } from "@/features/project-requests/components/status-badge";
+import { ProjectMatches } from "@/features/ai/components/project-matches";
 
 export default function RequestDetailPage() {
   const params = useParams<{ id: string }>();
@@ -124,6 +125,8 @@ export default function RequestDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      {request.status === "OPEN" && <ProjectMatches requestId={request.id} />}
     </div>
   );
 }

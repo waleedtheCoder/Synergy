@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SearchService } from '../search/search.service';
+import { RagIndexService } from '../ai/rag-index.service';
 import type { UpdateProfessionalProfileDto } from './dto/update-professional-profile.dto';
 
 const PROFILE_INCLUDE = {
@@ -21,6 +22,7 @@ export class ProfessionalProfileService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly searchService: SearchService,
+    private readonly ragIndex: RagIndexService,
   ) {}
 
   private async getProfileId(userId: string): Promise<string> {
@@ -112,6 +114,7 @@ export class ProfessionalProfileService {
     ]);
 
     void this.searchService.indexProfessionalById(id);
+    void this.ragIndex.indexProfessionalProfile(id);
 
     return this.findMe(userId);
   }

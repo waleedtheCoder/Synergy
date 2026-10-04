@@ -11,6 +11,7 @@ import { EmptyState } from "@/features/dashboard/components/empty-state";
 import { useAdminDisputes } from "@/features/admin/hooks";
 import { DisputeStatusBadge } from "@/features/admin/components/status-badges";
 import { ResolveDisputeDialog } from "@/features/admin/components/resolve-dispute-dialog";
+import { DisputeAssessmentPanel } from "@/features/ai/components/moderation-assessment";
 
 const STATUS_FILTERS: { label: string; value: DisputeStatus | undefined }[] = [
   { label: "All", value: undefined },
@@ -101,6 +102,7 @@ export default function AdminDisputesPage() {
                   </div>
                 )}
               </div>
+              {!isFinal(dispute.status) && <DisputeAssessmentPanel disputeId={dispute.id} />}
             </CardContent>
           </Card>
         ))}

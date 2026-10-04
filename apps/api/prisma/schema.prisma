@@ -998,3 +998,39 @@ model Report {
   @@index([targetType, targetId])
   @@map("reports")
 }
+
+// ────────────────────────────────────────────────────────────────────────
+// AI / RAG — vector embeddings (pgvector)
+// Written and queried only through raw SQL (see VectorStoreService):
+// Prisma can't read or write the `vector` column type.
+// ────────────────────────────────────────────────────────────────────────
+
+enum EmbeddingSourceType {
+  PROFESSIONAL_PROFILE
+  SERVICE
+  PORTFOLIO_PROJECT
+  CERTIFICATE
+  REVIEW
+  QUOTATION
+  MESSAGE
+  REPORT
+  DISPUTE
+  HELP_DOC
+}
+
+model Embedding {
+  id         String              @id @default(cuid())
+  sourceType EmbeddingSourceType @map("source_type")
+  // Source row id; long text is chunked as "<id>", "<id>#1", "<id>#2", …
+  sourceId   String              @map("source_id")
+  // Retrieval scope: professional id for profile content and quotations,
+  // chat id for messages, null for platform-wide content.
+  scopeId    String?             @map("scope_id")
+  content    String
+  embedding  Unsupported("vector(384)")
+  updatedAt  DateTime            @default(now()) @updatedAt @map("updated_at")
+
+  @@unique([sourceType, sourceId])
+  @@index([sourceType, scopeId])
+  @@map("embeddings")
+}

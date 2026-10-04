@@ -15,6 +15,7 @@ import {
   Role,
 } from '../../../generated/prisma';
 import { ChatGateway } from '../chats/chats.gateway';
+import { RagIndexService } from '../ai/rag-index.service';
 import { ChatsService, MESSAGE_INCLUDE } from '../chats/chats.service';
 import type { CreateQuotationDto } from './dto/create-quotation.dto';
 import type { UpdateQuotationStatusDto } from './dto/update-quotation-status.dto';
@@ -39,6 +40,7 @@ export class QuotationsService {
     private readonly prisma: PrismaService,
     private readonly chats: ChatsService,
     private readonly gateway: ChatGateway,
+    private readonly ragIndex: RagIndexService,
   ) {}
 
   async create(userId: string, role: Role, dto: CreateQuotationDto) {
@@ -95,6 +97,7 @@ export class QuotationsService {
     );
 
     this.gateway.broadcast(dto.chatId, 'message:new', message);
+    void this.ragIndex.indexQuotation(quotation.id);
 
     return quotation;
   }

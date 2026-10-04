@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { paginate } from '../../common/dto/pagination-query.dto';
 import { SearchService } from '../search/search.service';
+import { RagIndexService } from '../ai/rag-index.service';
 import { AdminAuditLogService } from './admin-audit-log.service';
 import type { QueryProfessionalsDto } from './dto/query-professionals.dto';
 import type { QueryCertificatesDto } from './dto/query-certificates.dto';
@@ -20,6 +21,7 @@ export class AdminVerificationService {
     private readonly prisma: PrismaService,
     private readonly searchService: SearchService,
     private readonly auditLog: AdminAuditLogService,
+    private readonly ragIndex: RagIndexService,
   ) {}
 
   async findProfessionals(query: QueryProfessionalsDto) {
@@ -131,6 +133,7 @@ export class AdminVerificationService {
       where: { id },
       data: { verified },
     });
+    void this.ragIndex.indexCertificate(id);
 
     await this.auditLog.log({
       adminId,

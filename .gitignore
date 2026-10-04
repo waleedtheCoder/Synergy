@@ -46,3 +46,5 @@ apps/api/uploads/*
 !apps/api/uploads/.gitkeep
 
 .claude
+# local AI model cache (transformers.js embedding model downloads)
+apps/api/.cache/
