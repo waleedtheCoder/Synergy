@@ -13,6 +13,11 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # prisma.config.ts resolves these at load time; generate/build never
+      # connect, so placeholders are enough in CI.
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+      DIRECT_URL: postgresql://ci:ci@localhost:5432/ci
     steps:
       - name: Checkout
         uses: actions/checkout@v4
