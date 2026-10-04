@@ -22,9 +22,9 @@ import { useLogout } from "@/features/auth/hooks";
 const NAV_LINKS = [
   { href: ROUTES.professional, label: "Find professionals" },
   { href: ROUTES.feed, label: "Feed" },
-  { href: "#how-it-works", label: "How it works" },
-  { href: "#categories", label: "Categories" },
-  { href: "#for-professionals", label: "For professionals" },
+  { href: "/#how-it-works", label: "How it works" },
+  { href: "/#categories", label: "Categories" },
+  { href: "/#for-professionals", label: "For professionals" },
 ];
 
 export function dashboardRoute(role: string) {

@@ -3,13 +3,13 @@ import { ROUTES } from "@/constants/routes";
 
 const FOOTER_LINKS = {
   Company: [
-    { label: "How it works", href: "#how-it-works" },
-    { label: "Categories", href: "#categories" },
+    { label: "How it works", href: "/#how-it-works" },
+    { label: "Categories", href: "/#categories" },
   ],
-  Clients: [{ label: "Find a professional", href: `${ROUTES.register}?role=CLIENT` }],
+  Clients: [{ label: "Find a professional", href: ROUTES.professional }],
   Professionals: [
     { label: "Join Synergi", href: `${ROUTES.register}?role=PROFESSIONAL` },
-    { label: "For professionals", href: "#for-professionals" },
+    { label: "For professionals", href: "/#for-professionals" },
   ],
   Legal: [
     { label: "Privacy Policy", href: ROUTES.privacy },
